@@ -29,7 +29,8 @@ if __name__ == "__main__":
         dati_train = reducer.interfaccia_utente()
 
         # PREPROCESSING TRAIN SET
-        preprocessor = Preprocessing(dati_train, is_train=True)
+        scelta_valori_nulli_train = 1
+        preprocessor = Preprocessing(dati_train, is_train=True, choice=scelta_valori_nulli_train)
         df_train_processato = preprocessor.esegui()
 
         print("\n--- RESOCONTO FINALE TRAINING ---")
@@ -51,8 +52,10 @@ if __name__ == "__main__":
             test_values = scegli_opener(path_test_values).open(path_test_values)
 
             # Esecuzione preprocessing sul test set usando lo scaler del train
+            scelta_valori_nulli_test = 3
             preprocessor_test = Preprocessing(test_values, scaler=preprocessor.scaler,
-                                              lista_colonne=preprocessor.lista_colonne, is_train=False)
+                                              lista_colonne=preprocessor.lista_colonne, is_train=False,
+                                              choice=scelta_valori_nulli_test)
             df_test_processato = preprocessor_test.esegui()
 
             print("\n--- RESOCONTO FINALE TEST ---")

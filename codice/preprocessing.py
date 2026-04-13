@@ -1,7 +1,6 @@
 import pandas as pd
 import os
 from abc import ABC, abstractmethod
-import time
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import StandardScaler
 
@@ -49,12 +48,16 @@ class Preprocessing:
     Classe incaricata della pulizia e preparazione del dataset.
     Riceve il dataframe già unito e restituisce il dataframe processato.
     """
-    def __init__(self, dataframe: pd.DataFrame, scaler=None, lista_colonne=None, is_train = True):
+    def __init__(self, dataframe: pd.DataFrame, scaler=None, lista_colonne=None, is_train = True, choice=2):
         self.df = dataframe.copy()
         # Permette di passare uno scaler pre-fittato (utile quando si processerà il test set)
         self.scaler = scaler if scaler else StandardScaler()
         self.lista_colonne = lista_colonne if lista_colonne else []
         self.is_train = is_train
+
+        if choice not in [1, 2, 3]:
+            raise ValueError("Il parametro 'choice' deve essere 1 (rimozione), 2 (media) o 3 (KNN).")
+        self.choice = choice
 
 
     def esegui(self) -> pd.DataFrame:
@@ -89,15 +92,17 @@ class Preprocessing:
         self.df = self.df.reset_index(drop=True)
 
 
-    def gestisci_valori_mancanti_rimozione(self, da):
+    def gestisci_valori_mancanti_rimozione(self):
+        da = self.df.copy()
         da.dropna(inplace=True)
         da.reset_index(drop=True, inplace=True)
         print("Righe con valori mancanti eliminate con successo!")
-        return da
+        self.df = da
 
 
-    def gestisci_valori_mancanti_media(self, da):
+    def gestisci_valori_mancanti_media(self):
         # Imputazione con la media su tutte le colonne numeriche che hanno NaN
+        da = self.df.copy()
         numeric_cols_with_nan = da.select_dtypes(include='number').columns[
             da.select_dtypes(include='number').isnull().any()]
         if self.is_train:
@@ -113,66 +118,49 @@ class Preprocessing:
                 da[col] = da[col].fillna(col_mean)
                 i = +1
             print(f"Imputazione univariata eseguita su colonne di test: {list(numeric_cols_with_nan)}")
+        self.df = da
 
-        return da
-
-
-    def gestisci_valori_mancanti_KNN(self, da):
+    def gestisci_valori_mancanti_KNN(self):
+        da = self.df.copy()
         numeric_cols = da.select_dtypes(include='number').columns
         imputer = KNNImputer(n_neighbors=5)
         da[numeric_cols] = imputer.fit_transform(da[numeric_cols])
         print("Imputazione multivariata (KNN) eseguita con successo!")
-        return da
+        self.df = da
 
 
     def gestisci_valori_mancanti(self):
         """Gestione interattiva dei valori nulli (NaN)."""
+
         n = self.df.isnull().sum().sum()
         print(f"\nSono stati trovati {n} valori mancanti.")
-        dat = self.df.copy()
 
-        while n > 0:
-            print(f"\nDato che sono stati trovati {n} valori mancanti, scegli un'operazione di pulizia:")
-            print("1. Eliminazione del record")
-            print("2. Imputazione univariata (media per ogni colonna numerica)")
-            print("3. Imputazione multivariata (KNN Imputer)")
-            print("4. Esci senza modifiche")
+        if n>0:
 
-            try:
-                choice = int(input("Inserisci la tua scelta (1-4): "))
-            except ValueError:
-                print("Scelta non valida. Inserisci un numero tra 1 e 4.")
-                time.sleep(1)
-                continue
-
-            if choice not in [1, 2, 3, 4]:
-                print("Scelta non valida. Riprova.")
-                time.sleep(1)
-                continue
-
-            if choice == 1:
-                dat = self.gestisci_valori_mancanti_rimozione(dat)
+            if self.choice == 1:
+                print("Scelta 1. Eliminazione del record")
+                self.gestisci_valori_mancanti_rimozione()
 
 
-            elif choice == 2:
-                dat = self.gestisci_valori_mancanti_media(dat)
+            elif self.choice == 2:
+                print("Scelta 2. Imputazione univariata (media per ogni colonna numerica)")
+                self.gestisci_valori_mancanti_media()
 
 
-            elif choice == 3:
-                dat = self.gestisci_valori_mancanti_KNN(dat)
+            elif self.choice == 3:
+                print("Scelta 3. Imputazione multivariata (KNN Imputer)")
+                self.gestisci_valori_mancanti_KNN()
 
+            else:
+                print("Scelta non valida. Uscita senza modifiche.")
 
-            elif choice == 4:
-                print("Uscita senza modifiche.")
-                break
+            #Controllo finale sui nulli
+            n = self.df.isnull().sum().sum()
+            print(f"\nSono stati trovati {n} valori mancanti dopo la pulizia.")
 
-            # Ricalcola n dopo ogni operazione per decidere se uscire dal loop
-            n = dat.isnull().sum().sum()
-            if n == 0:
-                print("Nessun valore mancante rimasto. Pulizia completata!")
+        else:
+            print("Nessun valore mancante trovato")
 
-        # Aggiornamento del dataframe
-        self.df = dat
 
     def dummy(self):
         """
