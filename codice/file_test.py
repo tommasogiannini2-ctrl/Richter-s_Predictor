@@ -1,9 +1,8 @@
 import unittest
-
-import unittest
 import pandas as pd
+import numpy as np
 from codice.data_reduction import DataReducer
-
+from codice.preprocessing import Preprocessing
 
 class TestDataReducer(unittest.TestCase):
 
@@ -15,7 +14,7 @@ class TestDataReducer(unittest.TestCase):
         - Grado 2: 70% (7.000 record)
         - Grado 3: 20% (2.000 record)
         """
-        print("\n[SetUp] Creazione del dataset...")
+        print("\n[SetUp] Creazione del dataset stratificato...")
         dati = {
             'building_id': range(10000),
             'dummy_feature': [1] * 10000,
@@ -58,6 +57,77 @@ class TestDataReducer(unittest.TestCase):
 
         print(f"Test superato: Il dataset è passato da {len(self.df_fake)} a {len(df_ridotto)} record.")
         print("Le proporzioni delle classi sono rimaste identiche.")
+
+
+class TestDataCleaning(unittest.TestCase):
+
+    def setUp(self):
+        """
+        Setup di un dataframe con valori nulli inseriti casualmente per testare la pulizia dei dati.
+        """
+        print("\n[SetUp] Creazione del dataset sporco...")
+        np.random.seed(42) # Per riproducibilità
+        n_rows = 1000
+        
+        # Creiamo un dataframe base con feature tipiche del problema
+        data = {
+            'building_id': range(n_rows),
+            'age': np.random.randint(0, 100, n_rows),
+            'area_percentage': np.random.randint(1, 100, n_rows),
+            'height_percentage': np.random.randint(1, 30, n_rows),
+            'foundation_type_r': np.random.choice([0, 1], n_rows),
+            'foundation_type_w': np.random.choice([0, 1], n_rows),
+            'damage_grade': np.random.choice([1, 2, 3], n_rows)
+        }
+        self.df_dirty = pd.DataFrame(data)
+        
+        # Inseriamo valori nulli a caso in alcune colonne (simulando circa il 10% di missing values)
+        colonne_da_sporcare = ['age', 'area_percentage', 'height_percentage', 'foundation_type_r']
+        
+        for col in colonne_da_sporcare:
+            # Scegliamo casualmente degli indici da impostare a NaN
+            n_nulls = int(n_rows * 0.1)
+            null_indices = np.random.choice(self.df_dirty.index, n_nulls, replace=False)
+            self.df_dirty.loc[null_indices, col] = np.nan
+
+    def test_presenza_valori_nulli(self):
+        """
+        Test di base per verificare che il dataframe contenga effettivamente valori nulli da pulire.
+        """
+        print("\n[Test] Verifica valori nulli nel dataset...")
+        null_counts = self.df_dirty.isnull().sum()
+        
+        # Stampa le colonne che contengono nulli
+        colonne_con_nulli = null_counts[null_counts > 0]
+        print("Valori nulli per colonna:")
+        print(colonne_con_nulli)
+        
+        # Assicuriamoci che ci siano valori nulli nel dataframe
+        self.assertTrue(self.df_dirty.isnull().values.any(), "Il dataframe dovrebbe contenere valori nulli per il test.")
+        print(f"Il dataframe contiene {self.df_dirty.isnull().sum().sum()} valori nulli totali.")
+
+    def test_pulizia_nulli_rimozione_righe(self):
+        """
+        Testa la rimozione delle righe con valori nulli.
+        """
+        print("\n[Test] Pulizia valori nulli tramite rimozione righe...")
+
+        # Copia il dataframe sporco per non alterare l'originale per altri test
+        df_rimozione = self.df_dirty.copy()
+        df_rimozione = Preprocessing.gestisci_valori_mancanti_rimozione([], df_rimozione)
+        self.assertFalse(df_rimozione.isnull().values.any(), "Il dataframe pulito dovrebbe non contenere valori nulli (RIMOZIONE).")
+        print(f"Il dataframe contiene {df_rimozione.isnull().sum().sum()} valori nulli totali.")
+
+    def test_pulizia_nulli_KNN(self):
+        """Testa l'imputazione dei valori nulli con l'algoritmo KNN."""
+        print("\n[Test] Pulizia valori nulli tramite KNN...")
+
+        # Copia il dataframe sporco per non alterare l'originale per altri test
+        df_knn = self.df_dirty.copy()
+        df_knn = Preprocessing.gestisci_valori_mancanti_KNN([], df_knn)
+        self.assertFalse(df_knn.isnull().values.any(),
+                         "Il dataframe pulito dovrebbe non contenere valori nulli (KNN).")
+        print(f"Il dataframe contiene {df_knn.isnull().sum().sum()} valori nulli totali.")
 
 
 if __name__ == '__main__':
