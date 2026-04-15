@@ -2,16 +2,16 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 # Importa i moduli della pipeline
-from data_cleaning import DataCleaning
-from data_imputation import DataImputation
-from data_encoding import DataEncoding
-
+from .data_cleaning import DataCleaning
+from .data_imputation import DataImputation
+from .data_encoding import DataEncoding
+from .data_standardization import DataScaling
 
 
 class Preprocessing:
     """
     Orchestratore principale della pipeline di preprocessing.
-    Coordina pulizia, imputazione e encoding del dataset.
+    Coordina pulizia, imputazione ed encoding del dataset.
     """
 
     def __init__(self, dataframe: pd.DataFrame, scaler=None, lista_colonne=None, is_train=True):
@@ -27,7 +27,7 @@ class Preprocessing:
         print(f"{'=' * 60}")
 
         # FASE 1: PULIZIA
-        print(f"\n[FASE 1/3] Pulizia dei dati...")
+        print(f"\n[FASE 1/4] Pulizia dei dati...")
         cleaning = DataCleaning(self.df)
 
         if self.is_train:
@@ -36,15 +36,25 @@ class Preprocessing:
 
         self.df = cleaning.pulisci()
 
-        # FASE 2: IMPUTAZIONE
-        print(f"\n[FASE 2/3] Imputazione dei valori mancanti...")
-        imputation = DataImputation(self.df, self.scaler, self.is_train)
+        # FASE 2: ENCODING DUMMY
+        print(f"\n[FASE 2/4] Encoding delle variabili categoriche (Dummy)...")
+        encoder = DataEncoding(self.df)
+        self.df = encoder.dummy()
+
+        # Allineamento colonne per il Test Set
+        if not self.is_train and self.lista_colonne:
+            # Assicuriamoci che il test set abbia le stesse colonne del train (riempiendo con 0 le mancanti)
+            self.df = self.df.reindex(columns=self.lista_colonne, fill_value=0)
+
+        # FASE 3: IMPUTAZIONE MULTIVARIATA
+        print(f"\n[FASE 3/4] Imputazione multivariata dei valori mancanti...")
+        imputation = DataImputation(self.df, is_train=self.is_train)
         self.df = imputation.imputa()
 
-        # FASE 3: ENCODING E STANDARDIZZAZIONE
-        print(f"\n[FASE 3/3] Encoding e standardizzazione...")
-        encoding = DataEncoding(self.df, self.scaler, self.is_train)
-        self.df = encoding.trasforma(self.lista_colonne)
+        # FASE 4: STANDARDIZZAZIONE
+        print(f"\n[FASE 4/4] Standardizzazione delle feature continue...")
+        scaler_obj = DataScaling(self.df, self.scaler, self.is_train)
+        self.df = scaler_obj.standardizza()
 
         # Aggiornamento della lista di colonne per il test set
         if self.is_train:

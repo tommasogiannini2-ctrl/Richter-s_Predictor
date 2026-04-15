@@ -1,5 +1,6 @@
 import os
-from preprocessing import Preprocessing, scegli_opener
+from data_pipeline.preprocessing import Preprocessing
+from data_pipeline.file_opener import scegli_opener
 from data_reduction import DataReducer
 
 if __name__ == "__main__":
@@ -30,7 +31,7 @@ if __name__ == "__main__":
 
         # PREPROCESSING TRAIN SET
         scelta_valori_nulli_train = 1
-        preprocessor = Preprocessing(dati_train, is_train=True, choice=scelta_valori_nulli_train)
+        preprocessor = Preprocessing(dati_train, is_train=True)
         df_train_processato = preprocessor.esegui()
 
         print("\n--- RESOCONTO FINALE TRAINING ---")
@@ -51,21 +52,23 @@ if __name__ == "__main__":
             print("\nCaricamento file di test in corso...")
             test_values = scegli_opener(path_test_values).open(path_test_values)
 
-            # Esecuzione preprocessing sul test set usando lo scaler del train
-            scelta_valori_nulli_test = 3
-            preprocessor_test = Preprocessing(test_values, scaler=preprocessor.scaler,
-                                              lista_colonne=preprocessor.lista_colonne, is_train=False,
-                                              choice=scelta_valori_nulli_test)
+            # Esecuzione preprocessing sul test set
+            preprocessor_test = Preprocessing(
+                test_values,
+                scaler=preprocessor.scaler,
+                lista_colonne=preprocessor.lista_colonne,
+                is_train=False
+            )
             df_test_processato = preprocessor_test.esegui()
 
             print("\n--- RESOCONTO FINALE TEST ---")
             print(f"Dimensioni Righe: {df_test_processato.shape[0]}")
-            print(f"Dimensioni Colonne:  {df_test_processato.shape[1]} \n")
+            print(f"Dimensioni Colonne: {df_test_processato.shape[1]} \n")
 
-            # SALVATAGGIO FILE TEST PROCESSATO
+            # Salvataggio file test processato
             output_test_path = os.path.join(output_dir, 'test_processato.csv')
             df_test_processato.to_csv(output_test_path, index=False)
-            print(f" File di test processato salvato in: {output_test_path}")
+            print(f"File di test processato salvato in: {output_test_path}")
 
     except Exception as ex:
-        print(f"Errore: {ex}")
+        print(f"Errore durante l'esecuzione: {ex}")
