@@ -13,12 +13,13 @@ class Preprocessing:
     Orchestratore principale della pipeline di preprocessing.
     Coordina pulizia, imputazione ed encoding del dataset.
     """
-
-    def __init__(self, dataframe: pd.DataFrame, scaler=None, lista_colonne=None, is_train=True):
+    def __init__(self, dataframe: pd.DataFrame, scaler=None, imputation_models=None, lista_colonne=None, is_train=True):
         self.df = dataframe.copy()
-        self.scaler = scaler if scaler else StandardScaler()
-        self.lista_colonne = lista_colonne if lista_colonne else []
+        self.scaler = scaler
+        self.imputation_models = imputation_models
+        self.lista_colonne = lista_colonne
         self.is_train = is_train
+        self.imputatore_istanza = None
 
     def esegui(self) -> pd.DataFrame:
         """Esegue l'intera pipeline di preprocessing."""
@@ -48,13 +49,15 @@ class Preprocessing:
 
         # FASE 3: IMPUTAZIONE MULTIVARIATA
         print(f"\n[FASE 3/4] Imputazione multivariata dei valori mancanti...")
-        imputation = DataImputation(self.df, is_train=self.is_train)
-        self.df = imputation.imputa()
+        imputation = DataImputation(is_train=self.is_train, models=self.imputation_models)
+        self.df = imputation.imputa(self.df)
+        self.imputatore_istanza = imputation
 
         # FASE 4: STANDARDIZZAZIONE
         print(f"\n[FASE 4/4] Standardizzazione delle feature continue...")
         scaler_obj = DataScaling(self.df, self.scaler, self.is_train)
         self.df = scaler_obj.standardizza()
+        self.scaler = scaler_obj.scaler
 
         # Aggiornamento della lista di colonne per il test set
         if self.is_train:

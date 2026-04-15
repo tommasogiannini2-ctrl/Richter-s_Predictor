@@ -34,6 +34,9 @@ if __name__ == "__main__":
         preprocessor = Preprocessing(dati_train, is_train=True)
         df_train_processato = preprocessor.esegui()
 
+        modelli_imputazione = preprocessor.imputatore_istanza.models
+        scaler_addestrato = preprocessor.scaler
+
         print("\n--- RESOCONTO FINALE TRAINING ---")
         print(f"Dimensioni Righe: {df_train_processato.shape[0]}")
         print(f"Dimensioni Colonne:  {df_train_processato.shape[1]} \n")
@@ -55,7 +58,8 @@ if __name__ == "__main__":
             # Esecuzione preprocessing sul test set
             preprocessor_test = Preprocessing(
                 test_values,
-                scaler=preprocessor.scaler,
+                scaler=scaler_addestrato,
+                imputation_models=modelli_imputazione,
                 lista_colonne=preprocessor.lista_colonne,
                 is_train=False
             )

@@ -2,7 +2,7 @@ import unittest
 import pandas as pd
 import numpy as np
 from codice.data_reduction import DataReducer
-from codice.preprocessing import Preprocessing
+from codice.data_pipeline.preprocessing import Preprocessing
 
 class TestDataReducer(unittest.TestCase):
 
@@ -114,8 +114,8 @@ class TestDataCleaning(unittest.TestCase):
 
         # Copia il dataframe sporco per non alterare l'originale per altri test
         df = self.df_dirty.copy()
-        df_rimozione = Preprocessing(dataframe=df, choice=1)
-        df_rimozione.gestisci_valori_mancanti()
+        df_rimozione = Preprocessing(dataframe=df)
+        df_rimozione.gestisci_valori_mancanti_multivariata()
         df_rimozione_processato = df_rimozione.df
         self.assertEqual(df_rimozione_processato.isnull().sum().sum(), 0, "Il dataframe pulito dovrebbe non contenere valori nulli (RIMOZIONE).")
         print(f"Il dataframe contiene {df_rimozione_processato.isnull().sum().sum()} valori nulli totali.")
