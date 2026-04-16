@@ -30,12 +30,14 @@ if __name__ == "__main__":
         dati_train = reducer.interfaccia_utente()
 
         # PREPROCESSING TRAIN SET
-        scelta_valori_nulli_train = 1
         preprocessor = Preprocessing(dati_train, is_train=True)
         df_train_processato = preprocessor.esegui()
 
-        modelli_imputazione = preprocessor.imputatore_istanza.models
         scaler_addestrato = preprocessor.scaler
+        imputer_num_addestrato = preprocessor.imputer_num
+        imputer_cat_addestrato = preprocessor.imputer_cat
+        colonne_eliminate = preprocessor.colonne_eliminate
+        lista_colonne_train = preprocessor.lista_colonne
 
         print("\n--- RESOCONTO FINALE TRAINING ---")
         print(f"Dimensioni Righe: {df_train_processato.shape[0]}")
@@ -43,36 +45,37 @@ if __name__ == "__main__":
         print("Informazioni sul dataframe:")
         df_train_processato.info()
         print(f"\nValori mancanti residui: {df_train_processato.isnull().sum().sum()}")
-
+ 
         # SALVATAGGIO FILE TRAINING PROCESSATO
         output_train_path = os.path.join(output_dir, 'train_processato.csv')
         df_train_processato.to_csv(output_train_path, index=False)
-        print(f"\n File di training processato salvato in: {output_train_path}")
+        print(f"\nFile di training processato salvato in: {output_train_path}")
 
         # PREPROCESSING TEST SET
         path_test_values = os.path.join(data_dir, 'Test_Values.csv')
         if os.path.exists(path_test_values):
             print("\nCaricamento file di test in corso...")
             test_values = scegli_opener(path_test_values).open(path_test_values)
-
-            # Esecuzione preprocessing sul test set
+ 
             preprocessor_test = Preprocessing(
                 test_values,
                 scaler=scaler_addestrato,
-                imputation_models=modelli_imputazione,
-                lista_colonne=preprocessor.lista_colonne,
+                imputer_num=imputer_num_addestrato,
+                imputer_cat=imputer_cat_addestrato,
+                colonne_eliminate=colonne_eliminate,
+                lista_colonne=lista_colonne_train,
                 is_train=False
             )
             df_test_processato = preprocessor_test.esegui()
-
+ 
             print("\n--- RESOCONTO FINALE TEST ---")
             print(f"Dimensioni Righe: {df_test_processato.shape[0]}")
             print(f"Dimensioni Colonne: {df_test_processato.shape[1]} \n")
-
-            # Salvataggio file test processato
+ 
             output_test_path = os.path.join(output_dir, 'test_processato.csv')
             df_test_processato.to_csv(output_test_path, index=False)
             print(f"File di test processato salvato in: {output_test_path}")
-
+ 
     except Exception as ex:
         print(f"Errore durante l'esecuzione: {ex}")
+        raise

@@ -1,58 +1,52 @@
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer, SimpleImputer
 
 
 class DataImputation:
-    def __init__(self, is_train=True, models=None):
+    """Gestisce i valori mancanti con imputazione multivariata.
+    """
+
+    def __init__(self, dataframe: pd.DataFrame, imputer_num = None, imputer_cat = None, is_train = True):
+        self.df = dataframe.copy()
         self.is_train = is_train
-        self.models = models if models is not None else {}
+        self.imputer_num = imputer_num
+        self.imputer_cat = imputer_cat
 
-    def imputa(self, df: pd.DataFrame) -> pd.DataFrame:
-        da = df.copy()
-        cols_with_nan = da.columns[da.isnull().any()].tolist()
+    def imputa(self) -> pd.DataFrame:
+        """Esegue l'imputazione separata per numeriche e categoriche."""
+        print("\n--- IMPUTAZIONE VALORI MANCANTI ---")
+        n_nan_prima = self.df.isnull().sum().sum()
+        print(f"Valori NaN prima dell'imputazione: {n_nan_prima}")
 
-        # Se siamo in fase di test, dobbiamo guardare le colonne che il TRAIN si aspettava di imputare
-        if not self.is_train:
-            cols_to_process = list(self.models.keys())
-        else:
-            cols_to_process = cols_with_nan
+        if n_nan_prima == 0:
+            print("Nessun valore mancante: imputazione saltata.")
+            return self.df
 
-        for target_col in cols_to_process:
-            features = [c for c in da.columns if c != target_col and da[c].notnull().all()]
+        colonne_escluse = ['building_id', 'damage_grade']
+        colonne_numeriche = [
+            c for c in self.df.select_dtypes(include='number').columns
+            if c not in colonne_escluse
+        ]
+        colonne_categoriche = self.df.select_dtypes(include=['object', 'string']).columns.tolist()
 
-            if not da[target_col].isnull().any():
-                continue
-
+        if colonne_numeriche:
             if self.is_train:
-                # --- FASE TRAINING ---
-                train_data = da[da[target_col].notnull()]
-                predict_data = da[da[target_col].isnull()]
-
-                if train_data.empty or not features:
-                    mean_val = da[target_col].mean()
-                    da[target_col] = da[target_col].fillna(mean_val)
-                    self.models[target_col] = ("mean", mean_val)
-                else:
-                    model = RandomForestRegressor(n_estimators=50, random_state=42, n_jobs=-1)
-                    model.fit(train_data[features], train_data[target_col])
-
-                    # Salviamo modello e lista feature usate
-                    self.models[target_col] = (model, features)
-
-                    predictions = model.predict(predict_data[features])
-                    da.loc[da[target_col].isnull(), target_col] = predictions
+                self.imputer_num = IterativeImputer(max_iter=10, random_state=42)
+                self.df[colonne_numeriche] = self.imputer_num.fit_transform(self.df[colonne_numeriche])
             else:
-                # --- FASE TEST (Prevenzione Leakage) ---
-                if target_col in self.models:
-                    stored_data = self.models[target_col]
+                self.df[colonne_numeriche] = self.imputer_num.transform(self.df[colonne_numeriche])
+            print(f"Numeriche ({len(colonne_numeriche)} colonne): IterativeImputer applicato.")
 
-                    if stored_data[0] == "mean":
-                        da[target_col] = da[target_col].fillna(stored_data[1])
-                    else:
-                        model, features = stored_data
-                        predict_data = da[da[target_col].isnull()]
+        if colonne_categoriche:
+            if self.is_train:
+                self.imputer_cat = SimpleImputer(strategy='most_frequent')
+                self.df[colonne_categoriche] = self.imputer_cat.fit_transform(self.df[colonne_categoriche])
+            else:
+                self.df[colonne_categoriche] = self.imputer_cat.transform(self.df[colonne_categoriche])
+            print(f"Categoriche ({len(colonne_categoriche)} colonne): moda applicata.")
 
-                        predictions = model.predict(predict_data[features])
-                        da.loc[da[target_col].isnull(), target_col] = predictions
+        n_nan_dopo = self.df.isnull().sum().sum()
+        print(f"Valori NaN dopo l'imputazione: {n_nan_dopo}")
 
-        return da
+        return self.df

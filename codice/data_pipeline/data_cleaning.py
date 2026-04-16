@@ -4,22 +4,25 @@ import pandas as pd
 class DataCleaning:
     """Gestisce la pulizia del dataset."""
 
-    def __init__(self, dataframe: pd.DataFrame):
+    def __init__(self, dataframe: pd.DataFrame, is_train: bool = True):
         self.df = dataframe.copy()
+        self.is_train = is_train
+        self.colonne_eliminate = []
 
     def pulisci(self) -> pd.DataFrame:
         """Esegue tutte le operazioni di pulizia in sequenza."""
         self.elimina_duplicati()
         self.pulisci_variabili()
-        self.elimina_classnull()
+        if self.is_train:
+            self.elimina_classnull()
         self.rimuovi_outlier_strutturali()
         return self.df
 
     def elimina_duplicati(self):
         """Rimuove i record duplicati."""
-        self.df = self.df.drop_duplicates()
-        self.df = self.df.reset_index(drop=True)
-        print(f"Duplicati eliminati. Righe attuali: {len(self.df)}")
+        righe_prima = len(self.df)
+        self.df = self.df.drop_duplicates().reset_index(drop=True)
+        print(f"Duplicati eliminati: {righe_prima - len(self.df)}. Righe attuali: {len(self.df)}")
 
     def pulisci_variabili(self):
         """Controlla e corregge i range delle variabili numeriche."""
@@ -51,7 +54,7 @@ class DataCleaning:
         """Rimuove i record con target nullo."""
         target_col = 'damage_grade'
         righe_originali = self.df.shape[0]
-
+ 
         if target_col in self.df.columns:
             self.df = self.df.dropna(subset=[target_col]).reset_index(drop=True)
             righe_dopo = len(self.df)
@@ -60,7 +63,7 @@ class DataCleaning:
     def rimuovi_outlier_strutturali(self):
         """Rimuove record che non rispettano i domini di valore attesi."""
         print("\n--- CONTROLLO OUTLIER STRUTTURALI ---")
-
+ 
         valid_values = {
             'land_surface_condition': ['n', 'o', 't'],
             'foundation_type': ['h', 'i', 'r', 'u', 'w'],
@@ -70,68 +73,71 @@ class DataCleaning:
             'position': ['j', 's', 'o', 't'],
             'plan_configuration': ['a', 'c', 'd', 'f', 'm', 'n', 'o', 'q', 's', 'u'],
             'legal_ownership_status': ['a', 'r', 'v', 'w'],
-            'has_superstructure_adobe_mud': [0, 1],
-            'has_superstructure_mud_mortar_stone': [0, 1],
-            'has_superstructure_stone_flag': [0, 1],
-            'has_superstructure_cement_mortar_stone': [0, 1],
-            'has_superstructure_mud_mortar_brick': [0, 1],
-            'has_superstructure_cement_mortar_brick': [0, 1],
-            'has_superstructure_timber': [0, 1],
-            'has_superstructure_rc_non_engineered': [0, 1],
-            'has_superstructure_rc_engineered': [0, 1],
-            'has_superstructure_other': [0, 1],
-            'has_secondary_use': [0, 1],
-            'has_secondary_use_agriculture': [0, 1],
-            'has_secondary_use_hotel': [0, 1],
-            'has_secondary_use_rental': [0, 1],
-            'has_secondary_use_institution': [0, 1],
-            'has_secondary_use_school': [0, 1],
-            'has_secondary_use_industry': [0, 1],
-            'has_secondary_use_health_post': [0, 1],
-            'has_secondary_use_gov_office': [0, 1],
-            'has_secondary_use_use_police': [0, 1],
-            'has_secondary_use_other': [0, 1],
         }
 
-        valid_mask = (
-                self.df['geo_level_1_id'].between(0, 30) &
-                self.df['geo_level_2_id'].between(0, 1427) &
-                self.df['geo_level_3_id'].between(0, 12567)
-        )
-
-        for col, values in valid_values.items():
-            if col in self.df.columns:
-                valid_mask &= (self.df[col].isin(values) | self.df[col].isna())
-
-        righe_prima = len(self.df)
-        self.df = self.df[valid_mask].reset_index(drop=True)
-        righe_dopo = len(self.df)
-
-        print(f"Righe rimosse come outlier: {righe_prima - righe_dopo}")
-        print(f"Righe rimanenti: {righe_dopo}")
+        colonne_binarie = [c for c in self.df.columns if c.startswith('has_')]
+        for col in colonne_binarie:
+            valid_values[col] = [0, 1]
+ 
+        if self.is_train:
+            valid_mask = pd.Series(True, index=self.df.index)
+ 
+            if 'geo_level_1_id' in self.df.columns:
+                valid_mask &= self.df['geo_level_1_id'].between(0, 30)
+            if 'geo_level_2_id' in self.df.columns:
+                valid_mask &= self.df['geo_level_2_id'].between(0, 1427)
+            if 'geo_level_3_id' in self.df.columns:
+                valid_mask &= self.df['geo_level_3_id'].between(0, 12567)
+ 
+            for col, values in valid_values.items():
+                if col in self.df.columns:
+                    valid_mask &= (self.df[col].isin(values) | self.df[col].isna())
+ 
+            righe_prima = len(self.df)
+            self.df = self.df[valid_mask].reset_index(drop=True)
+            print(f"[TRAIN] Righe rimosse come outlier: {righe_prima - len(self.df)}")
+            print(f"[TRAIN] Righe rimanenti: {len(self.df)}")
+        else:
+            n_corrections = 0
+            for col, values in valid_values.items():
+                if col in self.df.columns:
+                    mask = ~self.df[col].isin(values) & self.df[col].notna()
+                    n_corrections += mask.sum()
+                    self.df.loc[mask, col] = pd.NA
+            print(f"[TEST] Valori fuori dominio convertiti in NaN: {n_corrections}")
+            print(f"[TEST] Righe mantenute (tutte): {len(self.df)}")
 
     def elimina_record_null_percentuale(self, soglia_percentuale=0.30):
         """Rimuove i record con troppi null."""
         n_colonne = len(self.df.columns)
         min_valori_validi = int(n_colonne * (1 - soglia_percentuale))
-
+ 
         righe_prima = len(self.df)
         self.df = self.df.dropna(thresh=min_valori_validi).reset_index(drop=True)
         righe_eliminate = righe_prima - len(self.df)
-
+ 
         print(f"Record eliminati per troppi null (Soglia {soglia_percentuale * 100}%): {righe_eliminate}")
-
+ 
     def elimina_colonne_nulle(self, soglia_percentuale=0.4):
         """Rimuove le feature che superano la percentuale di null."""
         n_righe_totali = len(self.df)
         limite_nulli = n_righe_totali * soglia_percentuale
-
+ 
         serie_nulli = self.df.isnull().sum()
         colonne_da_eliminare = serie_nulli[serie_nulli > limite_nulli].index.tolist()
-
+ 
         if colonne_da_eliminare:
             print(f"Eliminate {len(colonne_da_eliminare)} feature (> {soglia_percentuale * 100}% nulli).")
             print(f"Feature rimosse: {colonne_da_eliminare}")
             self.df.drop(columns=colonne_da_eliminare, inplace=True)
+            self.colonne_eliminate = colonne_da_eliminare
         else:
             print(f"Controllo Qualità: Tutte le feature rispettano la soglia del {soglia_percentuale * 100}%.")
+ 
+    def applica_colonne_eliminate(self, colonne: list):
+        """Elimina le colonne passate."""
+        colonne_presenti = [c for c in colonne if c in self.df.columns]
+        if colonne_presenti:
+            self.df.drop(columns=colonne_presenti, inplace=True)
+            print(f"[TEST] Eliminate {len(colonne_presenti)} colonne per allineamento al train.")
+ 
