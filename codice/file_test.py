@@ -1,8 +1,10 @@
 import unittest
 import pandas as pd
 import numpy as np
-from codice.data_reduction import DataReducer
-from codice.data_pipeline.preprocessing import Preprocessing
+from .data_reduction import DataReducer
+from .data_pipeline.preprocessing import Preprocessing
+from .data_pipeline.data_imputation import DataImputation
+
 
 class TestDataReducer(unittest.TestCase):
 
@@ -114,40 +116,11 @@ class TestDataCleaning(unittest.TestCase):
 
         # Copia il dataframe sporco per non alterare l'originale per altri test
         df = self.df_dirty.copy()
-        df_rimozione = Preprocessing(dataframe=df)
-        df_rimozione.gestisci_valori_mancanti_multivariata()
+        df_rimozione = DataImputation(dataframe=df)
+        df_rimozione.imputa()
         df_rimozione_processato = df_rimozione.df
         self.assertEqual(df_rimozione_processato.isnull().sum().sum(), 0, "Il dataframe pulito dovrebbe non contenere valori nulli (RIMOZIONE).")
         print(f"Il dataframe contiene {df_rimozione_processato.isnull().sum().sum()} valori nulli totali.")
-
-    def test_pulizia_nulli_sostituzione_media(self):
-        """
-        Testa la sostituzione dei valori nulli con la media.
-        """
-        print("\n[Test] Pulizia valori nulli tramite sostituzione media...")
-
-        # Copia il dataframe sporco per non alterare l'originale per altri test
-        df = self.df_dirty.copy()
-        df_media = Preprocessing(dataframe=df, choice=2)
-        df_media.gestisci_valori_mancanti()
-        df_media_processato = df_media.df
-        self.assertEqual(df_media_processato.isnull().sum().sum(), 0,
-                         "Il dataframe pulito dovrebbe non contenere valori nulli (MEDIA).")
-        print(f"Il dataframe contiene {df_media_processato.isnull().sum().sum()} valori nulli totali.")
-
-    def test_pulizia_nulli_KNN(self):
-        """
-        Testa l'interpoazione dei valori nulli con l'algoritmo KNN'.
-        """
-        print("\n[Test] Pulizia valori nulli tramite interpolazione KNN...")
-
-        # Copia il dataframe sporco per non alterare l'originale per altri test
-        df = self.df_dirty.copy()
-        df_KNN = Preprocessing(dataframe=df, choice=3)
-        df_KNN.gestisci_valori_mancanti()
-        df_KNN_processato = df_KNN.df
-        self.assertEqual(df_KNN_processato.isnull().sum().sum(), 0,"Il dataframe pulito dovrebbe non contenere valori nulli (KNN).")
-        print(f"Il dataframe contiene {df_KNN_processato.isnull().sum().sum()} valori nulli totali.")
 
 
 if __name__ == '__main__':

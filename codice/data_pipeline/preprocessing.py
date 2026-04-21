@@ -2,10 +2,10 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
  
 # Importa i moduli della pipeline
-from data_pipeline.data_cleaning import DataCleaning
-from data_pipeline.data_imputation import DataImputation
-from data_pipeline.data_encoding import DataEncoding
-from data_pipeline.data_standardization import DataScaling
+from .data_cleaning import DataCleaning
+from .data_imputation import DataImputation
+from .data_encoding import DataEncoding
+from .data_standardization import DataScaling
 
 class Preprocessing:
     """
