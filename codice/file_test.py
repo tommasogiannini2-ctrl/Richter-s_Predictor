@@ -1,9 +1,9 @@
 import unittest
 import pandas as pd
 import numpy as np
-from .data_reduction import DataReducer
-from .data_pipeline.preprocessing import Preprocessing
-from .data_pipeline.data_imputation import DataImputation
+from data_reduction import DataReducer
+from data_pipeline.preprocessing import Preprocessing
+from data_pipeline.data_imputation import DataImputation
 
 
 class TestDataReducer(unittest.TestCase):
