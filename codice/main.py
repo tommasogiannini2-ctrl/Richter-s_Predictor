@@ -2,6 +2,7 @@ import os
 from data_pipeline.preprocessing import Preprocessing
 from data_pipeline.file_opener import scegli_opener
 from data_reduction import DataReducer
+from plot import Plotter
 
 
 if __name__ == "__main__":
@@ -35,6 +36,9 @@ if __name__ == "__main__":
         print(f"  {'Righe totali:':<40} {dati_train.shape[0]:>8}")
         print(f"  {'Colonne totali:':<40} {dati_train.shape[1]:>8}")
         print(f"{'=' * 60}")
+
+        explorer = Plotter(dati_train, output_dir=os.path.join(output_dir, "grafici"))
+        explorer.esegui_tutto()
 
         # ── DATA REDUCTION ────────────────────────────────────────────
         # Applicata solo al train set per alleggerire l'onere computazionale.
