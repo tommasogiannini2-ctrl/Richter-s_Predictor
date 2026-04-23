@@ -46,10 +46,11 @@ class _BaseSelector:
     nello stesso modo, indipendentemente dal metodo specifico.
     """
 
-    def __init__(self):
-        # Inizializzati da fit()
-        self.feature_names_selected_ = None
+    def __init__(self, is_train= True, feauture_names_selected_=None ):
+        # Inizializzati da fit() o passati per ripristino
+        self.feature_names_selected_ = feauture_names_selected_
         self.feature_names_in_ = None
+        self.is_train = is_train
 
     def fit(self, x, y):
         raise NotImplementedError("Implementare nella sottoclasse.")
@@ -63,8 +64,12 @@ class _BaseSelector:
         return x[self.feature_names_selected_].copy()
 
     def fit_transform(self, x, y):
-        self.fit(x, y)
-        return self.transform(x)
+        if self.is_train:
+            self.fit(x, y)
+            return self.transform(x)
+        else:
+            return self.transform(x)
+
 
     def get_info(self) -> dict:
         """Informazioni testuali sulla selezione, utili per il report."""

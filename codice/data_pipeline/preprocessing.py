@@ -1,10 +1,10 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from .data_cleaning import DataCleaning
-from .data_imputation import DataImputation
-from .data_encoding import DataEncoding
-from .data_standardization import DataScaling
+from data_cleaning import DataCleaning
+from data_imputation import DataImputation
+from data_encoding import DataEncoding
+from data_standardization import DataScaling
 
 
 class Preprocessing:
