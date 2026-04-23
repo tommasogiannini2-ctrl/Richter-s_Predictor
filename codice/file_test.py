@@ -1,9 +1,11 @@
 import unittest
 import pandas as pd
 import numpy as np
+from sklearn.datasets import make_classification
 from data_reduction import DataReducer
-from data_pipeline.preprocessing import Preprocessing
+#from data_pipeline.preprocessing import Preprocessing
 from data_pipeline.data_imputation import DataImputation
+from feature_select_extract import crea_selector
 
 
 class TestDataReducer(unittest.TestCase):
@@ -121,6 +123,60 @@ class TestDataCleaning(unittest.TestCase):
         df_rimozione_processato = df_rimozione.df
         self.assertEqual(df_rimozione_processato.isnull().sum().sum(), 0, "Il dataframe pulito dovrebbe non contenere valori nulli (RIMOZIONE).")
         print(f"Il dataframe contiene {df_rimozione_processato.isnull().sum().sum()} valori nulli totali.")
+
+
+
+class TestFeatureSelectors(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        """Genera il dataset una volta per tutta la classe di test."""
+        X, y = make_classification(
+            n_samples=500,
+            n_features=50,
+            n_informative=20,
+            n_classes=3,
+            weights=[0.10, 0.57, 0.33],
+            random_state=42
+        )
+        cls.X_demo = pd.DataFrame(X, columns=[f"feat_{i:02d}" for i in range(50)])
+        cls.y_demo = pd.Series(y)
+
+    def test_all_selectors_run(self):
+        """Verifica che tutti i selettori completino il fit_transform senza errori."""
+        kwargs_per_metodo = {
+            "all": {},
+            "mutual_info": {"k": 10},
+            "relief": {"k": 10, "n_samples": 100},
+            "sfs": {"k": 2, "cv": 2},  # K piccolo per velocità
+            "embedded_dt": {"soglia": "mean"},
+        }
+
+        for nome in ["all", "mutual_info", "relief", "sfs", "embedded_dt"]:
+            with self.subTest(metodo=nome):
+                sel = crea_selector(nome, **kwargs_per_metodo[nome])
+                X_ridotto = sel.fit_transform(self.X_demo, self.y_demo)
+
+                # Verifica che l'output sia un DataFrame
+                self.assertIsInstance(X_ridotto, pd.DataFrame)
+                # Verifica che le righe siano rimaste invariate
+
+                self.assertEqual(X_ridotto.shape[0], self.X_demo.shape[0])
+
+    def test_mutual_info_reduction(self):
+        """Verifica specifica che MutualInfo riduca il numero di feature a k."""
+        k_target = 15
+        sel = crea_selector("mutual_info", k=k_target)
+        X_ridotto = sel.fit_transform(self.X_demo, self.y_demo)
+
+        self.assertEqual(X_ridotto.shape[1], k_target)
+        self.assertEqual(len(sel.feature_names_selected_), k_target)
+
+    def test_invalid_selector_name(self):
+        """Verifica che il sistema reagisca correttamente a un nome metodo errato."""
+        with self.assertRaises(ValueError):  # O l'errore che solleva la tua factory
+            crea_selector("metodo_inesistente")
+
 
 
 if __name__ == '__main__':
