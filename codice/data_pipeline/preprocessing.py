@@ -1,10 +1,11 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-
-from data_cleaning import DataCleaning
-from data_imputation import DataImputation
-from data_encoding import DataEncoding
-from data_standardization import DataScaling
+from .data_cleaning import DataCleaning
+from .data_imputation import DataImputation
+from .data_encoding import DataEncoding
+from .data_standardization import DataScaling
+import pandas as pd
+from sklearn.model_selection import train_test_split
 
 
 class Preprocessing:
@@ -32,6 +33,7 @@ class Preprocessing:
         print(f"  PREPROCESSING — {modalita}")
         print(f"{'=' * 60}")
 
+
         # ── FASE 1: PULIZIA ──────────────────────────────────────────
         print(f"\n  [1/4] Pulizia dei dati")
         print(f"  {'-' * 48}")
@@ -46,6 +48,12 @@ class Preprocessing:
                 cleaning.applica_colonne_eliminate(self.colonne_eliminate)
 
         self.df = cleaning.pulisci()
+
+        # Salvataggio colonna target
+        target_col = 'damage_grade'
+        target_series = None
+        if target_col in self.df.columns:
+            target_series = self.df[target_col].copy()
 
         # ── FASE 2: IMPUTAZIONE ──────────────────────────────────────
         print(f"\n  [2/4] Imputazione valori mancanti")
@@ -74,6 +82,11 @@ class Preprocessing:
         scaling = DataScaling(self.df, scaler=self.scaler, is_train=self.is_train)
         self.df = scaling.standardizza()
 
+        if target_series is not None:
+            # Usiamo .values per evitare problemi di allineamento index
+            # se qualche fase ha resettato l'indice
+            self.df[target_col] = target_series.values
+
         if self.is_train:
             self.scaler = scaling.scaler
             self.lista_colonne = self.df.columns.tolist()
@@ -87,3 +100,35 @@ class Preprocessing:
         print(f"{'=' * 60}\n")
 
         return self.df
+
+
+def dividi_train_validation_test(df, target_column='damage_grade'):
+    # Prepariamo la stratificazione se la colonna è fornita
+    strat = df[target_column] if target_column else None
+
+    # STEP 1: 70% Train, 30% Temp
+    train_df, temp_df = train_test_split(
+        df,
+        test_size=0.30,
+        random_state=42,
+        shuffle=True,
+        stratify=strat
+    )
+
+    # Prepariamo la stratificazione per il secondo split
+    strat_temp = temp_df[target_column] if target_column else None
+
+    # STEP 2: 15% Validation, 15% Test
+    val_df, test_df = train_test_split(
+        temp_df,
+        test_size=0.50,
+        random_state=42,
+        shuffle=True,
+        stratify=strat_temp
+    )
+
+    print(f"Training set:   {len(train_df)} ({len(train_df) / len(df):.0%})")
+    print(f"Validation set: {len(val_df)} ({len(val_df) / len(df):.0%})")
+    print(f"Test set:       {len(test_df)} ({len(test_df) / len(df):.0%})")
+
+    return train_df, val_df, test_df
