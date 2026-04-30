@@ -35,26 +35,26 @@ class DataCleaning:
             mask_outlier = (self.df['age'] > 800) | (self.df['age'] < 0)
             n = mask_outlier.sum()
             self.df.loc[mask_outlier, 'age'] = pd.NA
-            print(f"  {'age  (fuori 0–800) → NaN:':<40} {n:>8}")
+            print(f"  {'age  (fuori 0–800)  NaN:':<40} {n:>8}")
 
         if 'count_floors_pre_eq' in self.df.columns:
             mask_piani = (self.df['count_floors_pre_eq'] > 15) | (self.df['count_floors_pre_eq'] <= 0)
             n = mask_piani.sum()
             self.df.loc[mask_piani, 'count_floors_pre_eq'] = pd.NA
-            print(f"  {'floors  (fuori 1–15) → NaN:':<40} {n:>8}")
+            print(f"  {'floors  (fuori 1–15)  NaN:':<40} {n:>8}")
 
         for col in ['area_percentage', 'height_percentage']:
             if col in self.df.columns:
                 mask = (self.df[col] <= 0) | (self.df[col] > 100)
                 n = mask.sum()
                 self.df.loc[mask, col] = pd.NA
-                print(f"  {col + '  (fuori 1–100) → NaN:':<40} {n:>8}")
+                print(f"  {col + '  (fuori 1–100)  NaN:':<40} {n:>8}")
 
         if 'count_families' in self.df.columns:
             mask_fam = self.df['count_families'] < 0
             n = mask_fam.sum()
             self.df.loc[mask_fam, 'count_families'] = pd.NA
-            print(f"  {'families  (negativi) → NaN:':<40} {n:>8}")
+            print(f"  {'families  (negativi)  NaN:':<40} {n:>8}")
 
     def elimina_classnull(self):
         """Rimuove i record con target nullo."""

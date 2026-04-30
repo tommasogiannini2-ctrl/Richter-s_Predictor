@@ -53,7 +53,6 @@ if __name__ == "__main__":
 
         # ── Separazione TRAIN, VALIDATION e TEST ────────────────────────────────────────────
         dati_train, dati_vali, dati_test = dividi_train_validation_test(dati_tot)
-
         print(f"DATAFRAME DI TRAIN \n {dati_train.info()}")
         print(f"DATAFRAME DI VALIDATION \n {dati_vali.info()}")
         print(f"DATAFRAME DI TEST \n {dati_test.info()}")
@@ -67,19 +66,14 @@ if __name__ == "__main__":
 
         X_train = df_train_processato.drop(columns=['damage_grade'])
 
+        # Trovare il numero di cluster ottimale
         engine = Clustering()
-
-        # Trova il K
         engine.plot_elbow_method(X_train)
 
         # Scegli K e fai il fit sul train
-        k_scelto = 4
+        k_scelto = 5
         train_clusters = engine.fit(X_train, k=k_scelto)
-
-        # Riattacchiamo i cluster ai dataframe originali che hanno ancora la label
         df_train_processato= pd.concat([df_train_processato, train_clusters], axis=1)
-
-        # Ora hai tutto insieme: feature, label originale e cluster!
         print(df_train_processato.info())
 
 
@@ -103,83 +97,62 @@ if __name__ == "__main__":
         print(f"  {'File salvato in:':<40} {output_train_path}")
         print(f"{'=' * 60}")
 
-        # ── PREPROCESSING VALIDATION SET ────────────────────────────────────
+        # Definiamo una struttura dati per iterare sui set di validation e test
+        datasets_to_process = {
+            "VALIDATION": {
+                "data": dati_vali,
+                "filename": 'val_processato.csv'
+            },
+            "TEST": {
+                "data": dati_test,
+                "filename": 'test_processato.csv'
+            }
+        }
 
-        # Vengono riusati scaler e imputer addestrati sul train (no data leakage)
-        preprocessor_test = Preprocessing(
-            dati_vali,
-            scaler=scaler_addestrato,
-            imputer_num=imputer_num_addestrato,
-            imputer_cat=imputer_cat_addestrato,
-            colonne_eliminate=colonne_eliminate,
-            lista_colonne=lista_colonne_train,
-            is_train=False
-        )
-        df_val_processato = preprocessor_test.esegui()
+        for label, info in datasets_to_process.items():
+            # ── PREPROCESSING ────────────────────────────────────
+            # Vengono riusati scaler e imputer addestrati sul train
+            preprocessor = Preprocessing(
+                info["data"],
+                scaler=scaler_addestrato,
+                imputer_num=imputer_num_addestrato,
+                imputer_cat=imputer_cat_addestrato,
+                lista_colonne=lista_colonne_train,
+                is_train=False
+            )
+            df_processato = preprocessor.esegui()
 
-        #  ── CLUSTERING TEST SET ───────────────────────────────────
+            # ── CLUSTERING ───────────────────────────────────────
+            # Rimuoviamo il target se presente (nel test set potrebbe non esserci)
+            X = df_processato.drop(
+                columns=['damage_grade']) if 'damage_grade' in df_processato.columns else df_processato
+            clusters = engine.predict(X)
+            df_processato = pd.concat([df_processato, clusters], axis=1)
+            print(df_processato.info())
 
-        X_val = df_val_processato.drop(columns=['damage_grade'])
+            # ── SALVATAGGIO ──────────────────────────────────────
+            output_path = os.path.join(output_dir, info["filename"])
+            df_processato.to_csv(output_path, index=False)
 
-        # Assegna i dati di Test ai cluster generati dal Train
-        val_clusters = engine.predict(X_val)
+            # ── RIEPILOGO COERENTE ───────────────────────────────
+            print(f"\n{'=' * 60}")
+            print(f"  RIEPILOGO {label}")
+            print(f"{'=' * 60}")
+            print(f"  {'Righe:':<40} {df_processato.shape[0]:>8}")
+            print(f"  {'Colonne:':<40} {df_processato.shape[1]:>8}")
+            print(f"  {'File salvato in:':<40} {output_path}")
+            print(f"{'=' * 60}")
 
-        # Riattacchiamo i cluster ai dataframe originali che hanno ancora la label
-        df_val_processato= pd.concat([df_val_processato, val_clusters], axis=1)
+            if label == "VALIDATION":
+                df_val_processato = df_processato
+            elif label == "TEST":
+                df_test_processato = df_processato
+            else:
+                print("ERRORE: LABEL NON VALIDA")
 
-        # Ora hai tutto insieme: feature, label originale e cluster!
-        print(df_val_processato.info())
+# -------------- FINITO IL PREPROCESSING ----------------------------------
+# i tre dataset sono: df_train_processato, df_val_processato, df_test_processato
 
-        # Salvataggio del test set processato
-        output_test_path = os.path.join(output_dir, 'val_processato.csv')
-        df_val_processato.to_csv(output_test_path, index=False)
-
-        print(f"\n{'=' * 60}")
-        print(f"  RIEPILOGO VALIDATION")
-        print(f"{'=' * 60}")
-        print(f"  {'Righe:':<40} {df_val_processato.shape[0]:>8}")
-        print(f"  {'Colonne:':<40} {df_val_processato.shape[1]:>8}")
-        print(f"  {'File salvato in:':<40} {output_test_path}")
-        print(f"{'=' * 60}")
-
-        # ── PREPROCESSING TEST SET ────────────────────────────────────
-
-        # Vengono riusati scaler e imputer addestrati sul train (no data leakage)
-        preprocessor_test = Preprocessing(
-            dati_test,
-            scaler=scaler_addestrato,
-            imputer_num=imputer_num_addestrato,
-            imputer_cat=imputer_cat_addestrato,
-            colonne_eliminate=colonne_eliminate,
-            lista_colonne=lista_colonne_train,
-            is_train=False
-        )
-        df_test_processato = preprocessor_test.esegui()
-
-        #  ── CLUSTERING TEST SET ───────────────────────────────────
-
-        X_test = df_test_processato.drop(columns=['damage_grade'])
-
-        # Assegna i dati di Test ai cluster generati dal Train
-        test_clusters = engine.predict(X_test)
-
-        # Riattacchiamo i cluster ai dataframe originali che hanno ancora la label
-        df_test_processato= pd.concat([df_test_processato, test_clusters], axis=1)
-
-        # Ora hai tutto insieme: feature, label originale e cluster!
-        print(df_test_processato.info())
-
-        # Salvataggio del test set processato
-        output_test_path = os.path.join(output_dir, 'test_processato.csv')
-        df_test_processato.to_csv(output_test_path, index=False)
-
-        print(f"\n{'=' * 60}")
-        print(f"  RIEPILOGO TEST")
-        print(f"{'=' * 60}")
-        print(f"  {'Righe:':<40} {df_test_processato.shape[0]:>8}")
-        print(f"  {'Colonne:':<40} {df_test_processato.shape[1]:>8}")
-        print(f"  {'File salvato in:':<40} {output_test_path}")
-        print(f"{'=' * 60}")
 
 
     except Exception as ex:
