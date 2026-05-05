@@ -179,5 +179,51 @@ class TestFeatureSelectors(unittest.TestCase):
 
 
 
+class TestFeatureSelectionSearch(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        """Genera dataset e divide in train/val per testare la ricerca."""
+        from sklearn.model_selection import train_test_split
+        X, y = make_classification(
+            n_samples=300,
+            n_features=20,
+            n_informative=5,
+            n_classes=2,
+            random_state=42
+        )
+        X_df = pd.DataFrame(X, columns=[f"feat_{i}" for i in range(20)])
+        y_sr = pd.Series(y)
+        
+        cls.X_train, cls.X_val, cls.y_train, cls.y_val = train_test_split(
+            X_df, y_sr, test_size=0.3, random_state=42
+        )
+
+    def test_search_strategy(self):
+        from validation import FeatureSelectionSearch
+        
+        search = FeatureSelectionSearch()
+        
+        # Testiamo tutti i selettori per verificare la robustezza della ricerca
+        config = {
+            "all": {},
+            "mutual_info": {"k": 5},
+            "relief": {"k": 5, "n_samples": 50},
+            "sfs": {"k": 2, "cv": 2},
+            "embedded_dt": {"soglia": "mean"}
+        }
+        
+        df_results = search.search(self.X_train, self.y_train, self.X_val, self.y_val, config)
+        
+        # Verifiche
+        self.assertIsInstance(df_results, pd.DataFrame)
+        self.assertEqual(len(df_results), 5)
+        self.assertIsNotNone(search.best_selector_name_)
+        self.assertIsNotNone(search.best_selector_)
+        self.assertTrue(search.best_score_ >= 0)
+        
+        # Verifica transform best
+        X_val_best = search.transform_with_best(self.X_val)
+        self.assertTrue(X_val_best.shape[1] <= 20)
+
 if __name__ == '__main__':
     unittest.main()

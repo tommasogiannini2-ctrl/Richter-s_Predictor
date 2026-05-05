@@ -150,9 +150,72 @@ if __name__ == "__main__":
             else:
                 print("ERRORE: LABEL NON VALIDA")
 
-# -------------- FINITO IL PREPROCESSING ----------------------------------
-# i tre dataset sono: df_train_processato, df_val_processato, df_test_processato
+        # ── FEATURE SELECTION ──────────────────────────────────────────
+        # In questa fase testiamo i 4 selettori implementati (più la baseline)
+        # per trovare il subset di feature che massimizza la micro-F1 sul validation set.
+        
+        from validation import FeatureSelectionSearch
 
+        print(f"\n{'=' * 60}")
+        print(f"  FASE 4: RICERCA STRATEGIA DI FEATURE SELECTION")
+        print(f"{'=' * 60}")
+
+        # Separazione feature e target
+        X_train = df_train_processato.drop(columns=['damage_grade'])
+        y_train = df_train_processato['damage_grade']
+        X_val   = df_val_processato.drop(columns=['damage_grade'])
+        y_val   = df_val_processato['damage_grade']
+
+        # Configurazione della ricerca: testiamo tutte le famiglie studiate
+        searcher = FeatureSelectionSearch()
+        config_selettori = {
+            "all":          {},                           # Baseline
+            "mutual_info":  {"k": 25},                    # Filter pair-wise
+            "relief":       {"k": 25, "n_samples": 500},  # Filter simultaneo
+            "sfs":          {"k": 15, "cv": 3},           # Subset selection
+            "embedded_dt":  {"soglia": "mean"}            # Embedded
+        }
+
+        # Esecuzione della ricerca
+        risultati_fs = searcher.search(X_train, y_train, X_val, y_val, config_selettori)
+        
+        # Salvataggio dei risultati della ricerca per il report
+        output_fs_path = os.path.join(output_dir, 'risultati_feature_selection.csv')
+        risultati_fs.to_csv(output_fs_path, index=False)
+        print(f"  Risultati della ricerca salvati in: {output_fs_path}")
+
+        # Recupero del miglior selettore e applicazione ai dataset
+        best_selector = searcher.get_best_selector()
+        
+        print(f"\n  Applicazione del miglior selettore ({searcher.best_selector_name_})...")
+        
+        X_train_sel = best_selector.transform(X_train)
+        X_val_sel   = best_selector.transform(X_val)
+        
+        # Per il test set, gestiamo l'eventuale assenza del target
+        X_test = df_test_processato.drop(columns=['damage_grade']) if 'damage_grade' in df_test_processato.columns else df_test_processato
+        X_test_sel = best_selector.transform(X_test)
+
+        # Ricomposizione dei DataFrame con target (se presente)
+        df_train_final = pd.concat([X_train_sel, y_train.reset_index(drop=True)], axis=1)
+        df_val_final   = pd.concat([X_val_sel, y_val.reset_index(drop=True)], axis=1)
+        
+        if 'damage_grade' in df_test_processato.columns:
+            y_test = df_test_processato['damage_grade']
+            df_test_final = pd.concat([X_test_sel, y_test.reset_index(drop=True)], axis=1)
+        else:
+            df_test_final = X_test_sel
+
+        # Salvataggio dei dataset finali pronti per l'addestramento
+        df_train_final.to_csv(os.path.join(output_dir, 'train_finale.csv'), index=False)
+        df_val_final.to_csv(os.path.join(output_dir, 'val_finale.csv'), index=False)
+        df_test_final.to_csv(os.path.join(output_dir, 'test_finale.csv'), index=False)
+
+        print(f"  Dataset finali salvati in: {output_dir}")
+        print(f"  Numero feature selezionate: {X_train_sel.shape[1]}")
+        print(f"{'=' * 60}\n")
+
+# -------------- FINE PIPELINE --------------------------------------------
 
 
     except Exception as ex:

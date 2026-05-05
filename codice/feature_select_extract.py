@@ -156,7 +156,7 @@ class MutualInfoSelector(_BaseSelector):
 
 
 # ---------------------------------------------------------------------------
-# 2) FILTER SIMULTANEO -- ReliefF
+# 2)
 # ---------------------------------------------------------------------------
 
 class ReliefFSelector(_BaseSelector):
