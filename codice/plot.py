@@ -1,45 +1,38 @@
+"""
+  01 — Distribuzione del target (squilibrio di classe)
+  02 — Valori mancanti per colonna (dopo DataCleaning)
+  03 — Matrice di correlazione (feature numeriche + binarie)
+  04 — Feature continue vs target (boxplot per classe)
+  05 — Feature categoriche vs target (stacked bar normalizzato)
+  06 — Distribuzione geografica del danno (geo_level_1_id)
+  07 — Distribuzione di age (istogramma con evidenza della skewness)
+"""
+
 import os
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
 
-
-# Palette coerente con evaluation.py: blu (classe 1), verde (classe 2), rosso (classe 3)
 _PALETTE_CLASSI = ["#4878CF", "#6ACC65", "#D65F5F"]
-_FIGSIZE_MEDIUM = (10, 6)
-_FIGSIZE_LARGE = (14, 8)
-
+_FIGSIZE_MEDIUM  = (10, 6)
+_FIGSIZE_LARGE   = (14, 8)
 
 class Plotter:
-    """
-    Classe per l'analisi esplorativa del dataset Richter's Predictor.
-
-    Riceve in input il dataframe di train (con `damage_grade` incluso) e produce
-    una serie di grafici che aiutano a comprendere i dati prima del modellamento.
-    """
-
     def __init__(self, dataframe: pd.DataFrame, output_dir: str = None):
-        # Copia difensiva per evitare modifiche involontarie al dataframe originale
         self.df = dataframe.copy()
         self.target = "damage_grade"
         self.output_dir = output_dir
 
-        # Nomi leggibili per le tre classi (usati nelle legende e negli assi)
         self.target_names = [
             "Danno Lieve (1)",
             "Danno Medio (2)",
             "Distruzione (3)",
         ]
 
-        # Classificazione delle colonne in gruppi semantici.
-        # Questo permette di applicare plot diversi a seconda del tipo di feature.
         self.colonne_continue = [
-            "age",
-            "area_percentage",
-            "height_percentage",
-            "count_floors_pre_eq",
-            "count_families",
+            "age", "area_percentage", "height_percentage",
+            "count_floors_pre_eq", "count_families",
         ]
 
         self.colonne_binarie = [c for c in self.df.columns if c.startswith("has_")]
@@ -53,23 +46,23 @@ class Plotter:
         self.colonne_geo = ["geo_level_1_id", "geo_level_2_id", "geo_level_3_id"]
 
     # ─────────────────────────────────────────────────────────────────────────
-    # PLOT 1: Distribuzione del target
+    # PLOT 1 — Distribuzione del target
     # ─────────────────────────────────────────────────────────────────────────
 
     def plot_distribuzione_target(self):
         """
-        Countplot del target `damage_grade`.
+        Countplot della variabile target `damage_grade`.
 
-        Mostra lo squilibrio di classe caratteristico del dataset:
-        tipicamente classe 1 ~10%, classe 2 ~57%, classe 3 ~33%.
-        Giustifica le scelte di metrica (micro-F1) e di gestione dello sbilanciamento.
+        Evidenzia lo squilibrio di classe caratteristico del dataset:
+          Classe 1 (Danno Lieve)  ~  9.6%
+          Classe 2 (Danno Medio)  ~ 56.9%
+          Classe 3 (Distruzione)  ~ 33.5%
         """
         if self.target not in self.df.columns:
             print(f"  [Skip] Colonna target '{self.target}' non presente.")
             return
 
-        # Conteggi assoluti e percentuali per ciascuna classe
-        conteggi = self.df[self.target].value_counts().sort_index()
+        conteggi   = self.df[self.target].value_counts().sort_index()
         percentuali = (conteggi / conteggi.sum() * 100).round(1)
 
         fig, ax = plt.subplots(figsize=_FIGSIZE_MEDIUM)
@@ -81,7 +74,6 @@ class Plotter:
             linewidth=1.5,
         )
 
-        # Annotazione sopra ogni barra: conteggio assoluto + percentuale
         for barra, count, perc in zip(barre, conteggi.values, percentuali.values):
             ax.text(
                 barra.get_x() + barra.get_width() / 2,
@@ -94,26 +86,19 @@ class Plotter:
         ax.set_ylabel("Numero di edifici", fontsize=12)
         ax.set_xlabel("Classe di danno", fontsize=12)
         ax.grid(axis="y", alpha=0.3)
-        # Margine superiore per far spazio alle annotazioni
-        ax.set_ylim(0, conteggi.max() * 1.15)
+        ax.set_ylim(0, conteggi.max() * 1.15)  # margine per le annotazioni
 
         plt.tight_layout()
         self._salva_o_mostra(fig, "01_distribuzione_target.png")
 
     # ─────────────────────────────────────────────────────────────────────────
-    # PLOT 2: Valori mancanti per colonna
+    # PLOT 2 — Valori mancanti per colonna
     # ─────────────────────────────────────────────────────────────────────────
 
     def plot_valori_mancanti(self):
         """
-        Barplot orizzontale della percentuale di valori mancanti per colonna.
-
-        Nota: sul dataset grezzo di Richter non ci sono NaN, ma dopo
-        `pulisci_variabili()` del modulo DataCleaning gli outlier vengono
-        convertiti in NaN. Questo plot è quindi più informativo se eseguito
-        dopo quel passaggio.
+        Barplot orizzontale della percentuale di NaN per colonna.
         """
-        # Percentuale di NaN per ogni colonna, ordinata decrescente
         pct_nulli = (self.df.isnull().sum() / len(self.df) * 100)
         pct_nulli = pct_nulli[pct_nulli > 0].sort_values(ascending=True)
 
@@ -123,19 +108,16 @@ class Plotter:
 
         fig, ax = plt.subplots(figsize=(10, max(4, len(pct_nulli) * 0.35)))
 
-        # Colora in rosso le colonne oltre soglia 40% (candidate alla rimozione)
         colori = ["#D65F5F" if v > 40 else "#4878CF" for v in pct_nulli.values]
+        barre  = ax.barh(pct_nulli.index, pct_nulli.values,
+                         color=colori, edgecolor="white")
 
-        barre = ax.barh(pct_nulli.index, pct_nulli.values, color=colori, edgecolor="white")
-
-        # Etichetta con il valore percentuale a fianco di ogni barra
         for barra, val in zip(barre, pct_nulli.values):
             ax.text(
                 val + 0.3, barra.get_y() + barra.get_height() / 2,
                 f"{val:.1f}%", va="center", fontsize=9,
             )
 
-        # Linea verticale di riferimento alla soglia di eliminazione (40%)
         ax.axvline(40, color="red", linestyle="--", alpha=0.6,
                    label="Soglia eliminazione (40%)")
 
@@ -148,85 +130,72 @@ class Plotter:
         self._salva_o_mostra(fig, "02_valori_mancanti.png")
 
     # ─────────────────────────────────────────────────────────────────────────
-    # PLOT 3: Matrice di correlazione
+    # PLOT 3 — Matrice di correlazione
     # ─────────────────────────────────────────────────────────────────────────
 
     def plot_correlazioni(self, soglia_annotazione: float = 0.3):
         """
-        Heatmap di correlazione tra le feature numeriche (continue + binarie).
-
-        Parameters
-        ----------
-        soglia_annotazione : float
-            Valore sotto il quale le correlazioni NON vengono annotate nella cella,
-            per evitare di sovraccaricare visivamente la heatmap.
-
-        Obiettivo: individuare feature ridondanti (correlazione alta tra loro)
-        e feature poco correlate col target (candidate all'eliminazione).
+        Heatmap di correlazione di Pearson tra feature numeriche e target.
         """
-        # Seleziona solo le colonne numeriche, escludendo gli ID geografici
-        # (hanno valori categorici codificati come interi, la correlazione
-        # lineare non è semanticamente sensata)
         colonne_da_correlare = [
             c for c in (self.colonne_continue + self.colonne_binarie + [self.target])
             if c in self.df.columns
         ]
 
         if len(colonne_da_correlare) < 2:
-            print("  [Skip] Meno di 2 colonne numeriche disponibili per la correlazione.")
+            print("  [Skip] Meno di 2 colonne numeriche disponibili.")
             return
 
         matrice_corr = self.df[colonne_da_correlare].corr()
-
-        # Maschera triangolare superiore: mostriamo solo la metà inferiore
-        # per evitare la ridondanza di una matrice simmetrica
         mask = np.triu(np.ones_like(matrice_corr, dtype=bool))
 
-        # Costruisce gli annot solo per le correlazioni oltre soglia (più leggibile)
         annot_matrix = matrice_corr.round(2).astype(str)
         annot_matrix = annot_matrix.where(matrice_corr.abs() >= soglia_annotazione, "")
+
+        n_cols = len(colonne_da_correlare)
+        tick_fontsize = max(6, 10 - n_cols // 5)
 
         fig, ax = plt.subplots(figsize=(14, 11))
         sns.heatmap(
             matrice_corr,
             mask=mask,
             annot=annot_matrix,
-            fmt="",
+            fmt="",                          
             cmap="RdBu_r",
             center=0,
             vmin=-1, vmax=1,
             square=True,
             linewidths=0.5,
             cbar_kws={"shrink": 0.7, "label": "Coefficiente di correlazione"},
+            annot_kws={"size": 8},          
             ax=ax,
         )
         ax.set_title(
-            f"Matrice di correlazione (annotazioni per |r| >= {soglia_annotazione})",
-            fontsize=14, pad=14,
+            f"Matrice di correlazione di Pearson  (annotazioni per |r| ≥ {soglia_annotazione})",
+            fontsize=13, pad=14,
         )
-        plt.xticks(rotation=45, ha="right")
-        plt.yticks(rotation=0)
+        plt.xticks(rotation=45, ha="right", fontsize=tick_fontsize)
+        plt.yticks(rotation=0, fontsize=tick_fontsize)
 
         plt.tight_layout()
         self._salva_o_mostra(fig, "03_correlazioni.png")
 
-        # Stampa testuale delle correlazioni più forti col target
         if self.target in matrice_corr.columns:
-            corr_target = matrice_corr[self.target].drop(self.target).abs().sort_values(ascending=False)
-            print(f"\n  Top 10 feature più correlate (in valore assoluto) con '{self.target}':")
+            corr_target = (matrice_corr[self.target]
+                           .drop(self.target)
+                           .abs()
+                           .sort_values(ascending=False))
+            print(f"\n  Top 10 feature più correlate con '{self.target}' (|r| Pearson):")
             for nome, val in corr_target.head(10).items():
-                print(f"    {nome:<40} {val:>6.3f}")
+                print(f"    {nome:<45} {val:.4f}")
 
     # ─────────────────────────────────────────────────────────────────────────
-    # PLOT 4: Feature numeriche vs target (boxplot)
+    # PLOT 4 — Feature continue vs target (boxplot)
     # ─────────────────────────────────────────────────────────────────────────
 
     def plot_numeriche_vs_target(self):
         """
-        Griglia di boxplot: una feature continua per pannello, suddivisa per classe di danno.
-
-        Permette di vedere visivamente se una feature ha potere discriminante:
-        se le distribuzioni delle tre classi sono simili, la feature è poco utile.
+        Griglia di boxplot: una feature continua per pannello, per classe di danno.
         """
         if self.target not in self.df.columns:
             print(f"  [Skip] Colonna target '{self.target}' non presente.")
@@ -237,7 +206,6 @@ class Plotter:
             print("  [Skip] Nessuna feature continua presente.")
             return
 
-        # Griglia dinamica: 2 colonne fisse, righe quante ne servono
         n = len(continue_presenti)
         ncols = 2
         nrows = (n + ncols - 1) // ncols
@@ -255,41 +223,92 @@ class Plotter:
                 palette=_PALETTE_CLASSI,
                 ax=ax,
                 legend=False,
-                # showfliers=False evita che gli outlier estremi schiaccino il grafico
-                # (es. age può arrivare a 995 che è un valore sentinella)
-                showfliers=False,
+                showfliers=False,   
             )
             ax.set_title(f"{colonna} per classe di danno", fontsize=11)
             ax.set_xlabel("Classe di danno")
             ax.set_ylabel(colonna)
-            ax.set_xticks(range(3))
+            ax.set_xticks([0, 1, 2])
             ax.set_xticklabels(["1 Lieve", "2 Medio", "3 Distr."])
             ax.grid(axis="y", alpha=0.3)
 
-        # Nasconde eventuali pannelli vuoti (quando n è dispari)
         for j in range(n, len(axes)):
             axes[j].set_visible(False)
 
         fig.suptitle(
-            "Distribuzione delle feature continue per classe di danno (outlier nascosti)",
-            fontsize=14, y=1.00,
+            "Distribuzione delle feature continue per classe di danno  (outlier nascosti)",
+            fontsize=14, y=1.01,
         )
         plt.tight_layout()
         self._salva_o_mostra(fig, "04_numeriche_vs_target.png")
 
     # ─────────────────────────────────────────────────────────────────────────
-    # PLOT 5: Distribuzione geografica del danno
+    # PLOT 5 — Feature categoriche vs target (stacked bar) [NUOVO]
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def plot_categoriche_vs_target(self):
+        """
+        Griglia di stacked bar chart normalizzati: una feature categorica per pannello.
+        """
+        cat_presenti = [c for c in self.colonne_categoriche if c in self.df.columns]
+        if not cat_presenti or self.target not in self.df.columns:
+            print("  [Skip] Colonne categoriche o target non presenti "
+                  "(usare il DataFrame grezzo, prima di DataEncoding).")
+            return
+
+        n = len(cat_presenti)
+        ncols = 2
+        nrows = (n + ncols - 1) // ncols
+
+        fig, axes = plt.subplots(nrows, ncols, figsize=(16, 4 * nrows))
+        axes = axes.flatten() if n > 1 else [axes]
+
+        for i, colonna in enumerate(cat_presenti):
+            ax = axes[i]
+
+            tabella = pd.crosstab(
+                self.df[colonna],
+                self.df[self.target],
+                normalize="index",
+            ) * 100
+
+            tabella.plot(
+                kind="bar",
+                stacked=True,
+                color=_PALETTE_CLASSI,
+                ax=ax,
+                width=0.8,
+                edgecolor="white",
+                legend=False,
+            )
+            ax.set_title(colonna, fontsize=11)
+            ax.set_xlabel("")
+            ax.set_ylabel("% edifici")
+            ax.set_ylim(0, 100)
+            ax.tick_params(axis="x", rotation=0)
+            ax.grid(axis="y", alpha=0.3)
+
+        handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in _PALETTE_CLASSI]
+        fig.legend(handles, self.target_names, title="Classe di danno",
+                   loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.02))
+
+        for j in range(n, len(axes)):
+            axes[j].set_visible(False)
+
+        fig.suptitle(
+            "Distribuzione delle classi di danno per feature categorica  (% normalizzata per riga)",
+            fontsize=14, y=1.01,
+        )
+        plt.tight_layout()
+        self._salva_o_mostra(fig, "05_categoriche_vs_target.png")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # PLOT 6 — Distribuzione geografica del danno
     # ─────────────────────────────────────────────────────────────────────────
 
     def plot_geografia_danno(self):
         """
-        Analisi del danno per geo_level_1_id: la regione geografica più ampia.
-
-        Produce due subplot:
-          a) Numero di edifici per regione
-          b) Distribuzione delle classi di danno per regione (proporzioni stacked)
-
-        Utile per capire se alcune zone sono state colpite più duramente di altre.
+        Analisi del danno per geo_level_1_id: la divisione geografica più ampia.
         """
         if "geo_level_1_id" not in self.df.columns or self.target not in self.df.columns:
             print("  [Skip] Colonne geografiche o target non presenti.")
@@ -297,10 +316,9 @@ class Plotter:
 
         fig, axes = plt.subplots(2, 1, figsize=_FIGSIZE_LARGE)
 
-        # ── (a) Numero di edifici per regione ──────────────────────────────
         conteggi_regione = self.df["geo_level_1_id"].value_counts().sort_index()
         axes[0].bar(
-            conteggi_regione.index,
+            conteggi_regione.index.astype(str),
             conteggi_regione.values,
             color="#5B9BD5", edgecolor="white",
         )
@@ -309,8 +327,6 @@ class Plotter:
         axes[0].set_ylabel("Numero di edifici")
         axes[0].grid(axis="y", alpha=0.3)
 
-        # ── (b) Proporzioni di danno per regione (stacked bar normalizzato) ──
-        # crosstab normalizzato per riga: ogni regione somma a 100%
         tabella = pd.crosstab(
             self.df["geo_level_1_id"],
             self.df[self.target],
@@ -328,69 +344,121 @@ class Plotter:
         axes[1].set_title("Distribuzione % delle classi di danno per regione", fontsize=12)
         axes[1].set_xlabel("geo_level_1_id")
         axes[1].set_ylabel("Percentuale (%)")
-        axes[1].legend(self.target_names, title="Classe", loc="center left",
-                       bbox_to_anchor=(1.01, 0.5))
+        axes[1].legend(self.target_names, title="Classe",
+                       loc="center left", bbox_to_anchor=(1.01, 0.5))
         axes[1].set_ylim(0, 100)
-        # Le tick label sono numeri di regione: ruotiamo solo se sono tante
+
+        # Con più di 15 regioni le etichette si sovrappongono senza rotazione
         if len(tabella) > 15:
             axes[1].tick_params(axis="x", rotation=45)
+            axes[0].tick_params(axis="x", rotation=45)
 
         plt.tight_layout()
-        self._salva_o_mostra(fig, "05_geografia_danno.png")
+        self._salva_o_mostra(fig, "06_geografia_danno.png")
 
     # ─────────────────────────────────────────────────────────────────────────
-    # METODO AGGREGATORE
+    # PLOT 7 — Distribuzione di age (istogramma + KDE) [NUOVO]
     # ─────────────────────────────────────────────────────────────────────────
+
+    def plot_distribuzione_age(self):
+        """
+        Istogramma con curva KDE della variabile `age`, separato per classe di danno.
+        """
+        if "age" not in self.df.columns:
+            print("  [Skip] Colonna 'age' non presente.")
+            return
+
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+        soglia_visualizzazione = 200
+        df_clip = self.df[self.df["age"] <= soglia_visualizzazione]
+        pct_esclusi = (len(self.df) - len(df_clip)) / len(self.df) * 100
+
+        for classe, colore, nome in zip([1, 2, 3], _PALETTE_CLASSI, self.target_names):
+            subset = df_clip[df_clip[self.target] == classe]["age"] if self.target in df_clip.columns else df_clip["age"]
+            axes[0].hist(
+                subset,
+                bins=40,
+                alpha=0.5,
+                color=colore,
+                label=nome if self.target in df_clip.columns else "age",
+                density=True,   # normalizza a densità per confronto tra classi sbilanciate
+            )
+
+        axes[0].set_title(
+            f"Distribuzione di age per classe  (range 0-{soglia_visualizzazione}, "
+            f"escluso {pct_esclusi:.1f}% coda)",
+            fontsize=11,
+        )
+        axes[0].set_xlabel("Età edificio (anni)")
+        axes[0].set_ylabel("Densità")
+        axes[0].legend()
+        axes[0].grid(axis="y", alpha=0.3)
+
+        axes[1].boxplot(
+            [self.df[self.df[self.target] == k]["age"].values
+             if self.target in self.df.columns else self.df["age"].values
+             for k in [1, 2, 3]],
+            labels=["1 Lieve", "2 Medio", "3 Distr."],
+            patch_artist=True,
+            boxprops=dict(facecolor="#DDEEFF"),
+            medianprops=dict(color="navy", linewidth=2),
+            showfliers=False,   # nasconde outlier estremi (age=995)
+        )
+        skew_val = self.df["age"].skew()
+        axes[1].set_title(
+            f"Boxplot age per classe  (outlier nascosti)\nskewness totale = {skew_val:.2f}",
+            fontsize=11,
+        )
+        axes[1].set_xlabel("Classe di danno")
+        axes[1].set_ylabel("Età edificio (anni)")
+        axes[1].grid(axis="y", alpha=0.3)
+
+        plt.tight_layout()
+        self._salva_o_mostra(fig, "07_distribuzione_age.png")
 
     def esegui_tutto(self):
         """
         Esegue tutte le analisi esplorative in sequenza.
 
-        Utile da chiamare in un'unica riga dal main dopo aver caricato i dati grezzi.
+        Chiamare con il DataFrame GREZZO (prima di DataEncoding), poiché
+        plot_categoriche_vs_target() richiede le colonne stringa originali.
         """
         sep = "=" * 62
         print(f"\n{sep}")
-        print("  ANALISI ESPLORATIVA DEI DATI ")
+        print("  ANALISI ESPLORATIVA DEI DATI")
         print(sep)
         print(f"  {'Righe:':<40} {self.df.shape[0]:>8,}")
         print(f"  {'Colonne:':<40} {self.df.shape[1]:>8}")
+        print(f"  {'Output dir:':<40} {self.output_dir or 'interattivo':>8}")
         print(sep)
 
-        print("\n  [1/5] Distribuzione del target...")
-        self.plot_distribuzione_target()
+        steps = [
+            ("[1/7] Distribuzione del target...",          self.plot_distribuzione_target),
+            ("[2/7] Valori mancanti per colonna...",       self.plot_valori_mancanti),
+            ("[3/7] Matrice di correlazione...",           self.plot_correlazioni),
+            ("[4/7] Feature continue vs target...",        self.plot_numeriche_vs_target),
+            ("[5/7] Feature categoriche vs target...",     self.plot_categoriche_vs_target),
+            ("[6/7] Distribuzione geografica del danno...",self.plot_geografia_danno),
+            ("[7/7] Distribuzione di age...",              self.plot_distribuzione_age),
+        ]
 
-        print("\n  [2/5] Valori mancanti per colonna...")
-        self.plot_valori_mancanti()
-
-        print("\n  [3/5] Matrice di correlazione...")
-        self.plot_correlazioni()
-
-        print("\n  [4/5] Feature continue per classe di danno...")
-        self.plot_numeriche_vs_target()
-
-        print("\n  [5/5] Distribuzione geografica del danno...")
-        self.plot_geografia_danno()
+        for label, metodo in steps:
+            print(f"\n  {label}")
+            metodo()
 
         print(f"\n{sep}")
         print("  Analisi completata.")
+        if self.output_dir:
+            print(f"  Grafici salvati in: {self.output_dir}")
         print(sep)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Metodo privato: salva il grafico su disco oppure lo mostra a schermo
-    # ─────────────────────────────────────────────────────────────────────────
-
     def _salva_o_mostra(self, fig: plt.Figure, nome_file: str):
-        """
-        Salva il grafico nella cartella `output_dir` (se specificata),
-        altrimenti lo mostra direttamente a schermo.
-
-        Stessa logica usata nel modulo evaluation.py per coerenza.
-        """
         if self.output_dir is not None:
             os.makedirs(self.output_dir, exist_ok=True)
             percorso = os.path.join(self.output_dir, nome_file)
             fig.savefig(percorso, dpi=150, bbox_inches="tight")
-            print(f"    [Grafico salvato] -> {percorso}")
+            print(f"    → Salvato: {percorso}")
             plt.close(fig)
         else:
             plt.show()

@@ -5,7 +5,7 @@ from sklearn.datasets import make_classification
 from data_reduction import DataReducer
 #from data_pipeline.preprocessing import Preprocessing
 from data_pipeline.data_imputation import DataImputation
-from feature_select_extract import crea_selector
+from codice.model_evaluation.feature_select_extract import crea_selector
 
 
 class TestDataReducer(unittest.TestCase):
@@ -199,7 +199,7 @@ class TestFeatureSelectionSearch(unittest.TestCase):
         )
 
     def test_search_strategy(self):
-        from validation import FeatureSelectionSearch
+        from codice.model_evaluation.validation import FeatureSelectionSearch
         
         search = FeatureSelectionSearch()
         

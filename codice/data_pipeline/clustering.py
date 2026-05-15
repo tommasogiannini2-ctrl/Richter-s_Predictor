@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
@@ -8,7 +9,7 @@ class Clustering:
         self.model = None
         self.k_ottimale = None
 
-    def plot_elbow_method(self, train_df, max_k=10, sample_size=30000):
+    def plot_elbow_method(self, train_df, max_k=10, sample_size=30000, output_dir=None):
         """Trova il K ottimale usando solo i dati di Train."""
         sample = train_df.sample(n=min(len(train_df), sample_size), random_state=42)
         distortions = []
@@ -19,10 +20,20 @@ class Clustering:
             km.fit(sample)
             distortions.append(km.inertia_)
 
-        plt.figure(figsize=(10, 5))
+        fig=plt.figure(figsize=(10, 5))
         plt.plot(K_range, distortions, 'bo-')
         plt.title('Metodo del Gomito (Dati di Train)')
-        plt.show()
+        plt.tight_layout()
+
+        if output_dir is not None:
+            os.makedirs(output_dir, exist_ok=True)
+            percorso = os.path.join(output_dir, 'clustering_elbow.png')
+            fig.savefig(percorso, dpi=150, bbox_inches='tight')
+            print(f"    → Salvato: {percorso}")
+            plt.close(fig)
+        else:
+            plt.show()
+            plt.close(fig)
 
     def fit(self, train_df, k):
         """Addestra il modello e restituisce il One-Hot Encoding dei cluster."""
