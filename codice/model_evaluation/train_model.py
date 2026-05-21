@@ -42,8 +42,9 @@ import pickle
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
 
 from model_evaluation.evaluation import ModelEvaluator
 
@@ -61,6 +62,8 @@ def _build_model(
     n_neighbors: int   = 7,
     weights: str       = "distance",
     metric: str        = "euclidean",
+    learning_rate: float = 1.0,
+    base_estimator_max_depth: int = 1,
 ):
     """
     Istanzia il modello scelto con i parametri forniti.
@@ -68,7 +71,7 @@ def _build_model(
     Parameters
     ----------
     model : str
-        'rf' per RandomForest, 'knn' per KNeighborsClassifier.
+        'rf' per RandomForest, 'knn' per KNeighborsClassifier, 'ada' per AdaBoostClassifier.
     Gli altri parametri sono gli iperparametri specifici del modello.
 
     Returns
@@ -91,7 +94,7 @@ def _build_model(
         print(f"    max_depth        = {max_depth}")
         print(f"    min_samples_leaf = {min_samples_leaf}")
         print(f"    class_weight     = {cw}")
-    else:
+    elif model == "knn":
         estimator = KNeighborsClassifier(
             n_neighbors=n_neighbors,
             weights=weights,
@@ -102,6 +105,20 @@ def _build_model(
         print(f"    n_neighbors = {n_neighbors}")
         print(f"    weights     = {weights}")
         print(f"    metric      = {metric}")
+    elif model == "ada":
+        base_est = DecisionTreeClassifier(max_depth=base_estimator_max_depth, random_state=42)
+        estimator = AdaBoostClassifier(
+            estimator=base_est,
+            n_estimators=n_estimators,
+            learning_rate=learning_rate,
+            random_state=42,
+        )
+        print(f"  Modello: AdaBoostClassifier")
+        print(f"    n_estimators   = {n_estimators}")
+        print(f"    learning_rate  = {learning_rate}")
+        print(f"    base_estimator = DecisionTreeClassifier(max_depth={base_estimator_max_depth})")
+    else:
+        raise ValueError(f"Modello '{model}' non supportato.")
 
     return estimator
 
@@ -123,6 +140,9 @@ def run(
     n_neighbors: int  = 7,
     weights: str      = "distance",
     metric: str       = "euclidean",
+    # iperparametri AdaBoost
+    learning_rate: float = 1.0,
+    base_estimator_max_depth: int = 1,
 ):
     """
     Esegue l'intero flusso di training, valutazione e submission.
@@ -134,7 +154,7 @@ def run(
     Parameters
     ----------
     model : str
-        'rf' o 'knn'.
+        'rf', 'knn' o 'ada'.
     output_dir : str
         Directory contenente i file prodotti da main.py.
     no_proba : bool
@@ -205,6 +225,8 @@ def run(
         n_neighbors=n_neighbors,
         weights=weights,
         metric=metric,
+        learning_rate=learning_rate,
+        base_estimator_max_depth=base_estimator_max_depth,
     )
 
     print(f"\n  Addestramento su {len(X_train):,} campioni...")
@@ -321,7 +343,7 @@ def _parse_args():
         description="Richter's Predictor — Addestramento modello finale",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--model",            type=str, default="rf", choices=["rf", "knn"])
+    parser.add_argument("--model",            type=str, default="rf", choices=["rf", "knn", "ada"])
     parser.add_argument("--output-dir",       type=str, default="../output")
     parser.add_argument("--no-proba",         action="store_true")
     parser.add_argument("--n-estimators",     type=int, default=300)
@@ -333,6 +355,8 @@ def _parse_args():
                         choices=["uniform", "distance"])
     parser.add_argument("--metric",           type=str, default="euclidean",
                         choices=["euclidean", "manhattan"])
+    parser.add_argument("--learning-rate",    type=float, default=1.0)
+    parser.add_argument("--base-estimator-max-depth", type=int, default=1)
     return parser.parse_args()
 
 
@@ -351,6 +375,8 @@ def main():
             n_neighbors      = args.n_neighbors,
             weights          = args.weights,
             metric           = args.metric,
+            learning_rate    = args.learning_rate,
+            base_estimator_max_depth = args.base_estimator_max_depth,
         )
     except Exception as ex:
         print(f"\n{'=' * 60}")

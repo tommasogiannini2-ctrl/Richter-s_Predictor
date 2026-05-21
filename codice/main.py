@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 
 from data_pipeline.preprocessing import Preprocessing, dividi_train_validation_test
 from data_pipeline.file_opener import scegli_opener
@@ -368,12 +368,30 @@ if __name__ == "__main__":
         # Determina il modello migliore trovato dalla feature selection search
         # e avvia direttamente training, valutazione e generazione submission.
         best_model_obj  = search.get_best_params()['model']
-        nome_modello    = 'rf' if isinstance(best_model_obj, RandomForestClassifier) else 'knn'
+        if isinstance(best_model_obj, RandomForestClassifier):
+            nome_modello = 'rf'
+        elif isinstance(best_model_obj, AdaBoostClassifier):
+            nome_modello = 'ada'
+        else:
+            nome_modello = 'knn'
 
         print(f"\n  Modello migliore dalla feature selection search: "
               f"{type(best_model_obj).__name__} → avvio training finale...")
 
-        avvia_training(model=nome_modello, output_dir=output_dir)
+        # Estrazione degli iperparametri del modello migliore per passarli a avvia_training.
+        # RandomizedSearchCV salva i parametri con il prefisso 'model__'.
+        params_modello = {
+            k.replace('model__', ''): v 
+            for k, v in search.get_best_params().items() 
+            if k.startswith('model__')
+        }
+        
+        # Gestione speciale per AdaBoost: 'estimator' -> 'base_estimator_max_depth'
+        if nome_modello == 'ada' and 'estimator' in params_modello:
+            base_est = params_modello.pop('estimator')
+            params_modello['base_estimator_max_depth'] = base_est.max_depth
+
+        avvia_training(model=nome_modello, output_dir=output_dir, **params_modello)
  
     # ── GESTIONE ERRORI ───────────────────────────────────────────────────
     except Exception as ex:

@@ -49,8 +49,9 @@ import pandas as pd
 
 from scipy.stats import randint
 
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import RandomizedSearchCV
 
@@ -69,7 +70,7 @@ from model_evaluation.feature_select_extract import (
 
 def _build_search_space(include_sfs: bool = True) -> list:
     """
-    Costruisce la lista di 10 dizionari che definisce lo spazio di ricerca.
+    Costruisce la lista di dizionari che definisce lo spazio di ricerca.
 
     Ogni dizionario rappresenta una coppia (selettore, modello) e contiene
     solo i parametri sensati per quella coppia specifica.
@@ -77,7 +78,7 @@ def _build_search_space(include_sfs: bool = True) -> list:
     Parameters
     ----------
     include_sfs : bool
-        Se False, esclude i 2 dizionari con SFSSelector per velocizzare
+        Se False, esclude i dizionari con SFSSelector per velocizzare
         la ricerca (utile in fase di sviluppo o con dataset grandi).
 
     Returns
@@ -91,13 +92,9 @@ def _build_search_space(include_sfs: bool = True) -> list:
 
     # -----------------------------------------------------------------------
     # ① AllFeaturesSelector + RandomForest
-    #    Nessun parametro del selettore (è una passthrough).
-    #    Baseline utile: se RF con tutte le feature batte tutto il resto,
-    #    la feature selection non è necessaria.
     # -----------------------------------------------------------------------
     spazio.append({
         "selector": [AllFeaturesSelector()],
-        # AllFeaturesSelector non ha iperparametri da campionare
         "model": [RandomForestClassifier(random_state=42)],
         "model__n_estimators":  randint(100, 400),
         "model__max_depth":     [None, 10, 20, 30],
@@ -107,9 +104,6 @@ def _build_search_space(include_sfs: bool = True) -> list:
 
     # -----------------------------------------------------------------------
     # ② AllFeaturesSelector + KNN
-    #    KNN è sensibile alla dimensionalità (curse of dimensionality):
-    #    avere molte feature senza selezione tende a penalizzarlo.
-    #    Questo dizionario permette di quantificare quanto.
     # -----------------------------------------------------------------------
     spazio.append({
         "selector": [AllFeaturesSelector()],
@@ -121,14 +115,24 @@ def _build_search_space(include_sfs: bool = True) -> list:
     })
 
     # -----------------------------------------------------------------------
-    # ③ MutualInfoSelector + RandomForest
-    #    MI filtra feature irrilevanti ma mantiene eventuali ridondanze.
-    #    Con RF (che ha sua feature selection interna) ci aspettiamo un
-    #    leggero miglioramento di velocità senza perdita di score.
+    # ③ AllFeaturesSelector + AdaBoost
+    # -----------------------------------------------------------------------
+    spazio.append({
+        "selector": [AllFeaturesSelector()],
+        "model": [AdaBoostClassifier(random_state=42)],
+        "model__n_estimators": randint(50, 300),
+        "model__learning_rate": [0.01, 0.05, 0.1, 0.5, 1.0],
+        "model__estimator": [DecisionTreeClassifier(max_depth=1), 
+                             DecisionTreeClassifier(max_depth=2),
+                             DecisionTreeClassifier(max_depth=3)],
+    })
+
+    # -----------------------------------------------------------------------
+    # ④ MutualInfoSelector + RandomForest
     # -----------------------------------------------------------------------
     spazio.append({
         "selector": [MutualInfoSelector()],
-        "selector__k":            randint(15, 40),   # range sensato sul n. feature dopo encoding
+        "selector__k":            randint(15, 40),
         "model": [RandomForestClassifier(random_state=42)],
         "model__n_estimators":    randint(100, 400),
         "model__max_depth":       [None, 10, 20, 30],
@@ -137,9 +141,7 @@ def _build_search_space(include_sfs: bool = True) -> list:
     })
 
     # -----------------------------------------------------------------------
-    # ④ MutualInfoSelector + KNN
-    #    MI + KNN è una combinazione classica: ridurre la dimensionalità
-    #    prima di KNN mitiga la curse of dimensionality.
+    # ⑤ MutualInfoSelector + KNN
     # -----------------------------------------------------------------------
     spazio.append({
         "selector": [MutualInfoSelector()],
@@ -152,16 +154,27 @@ def _build_search_space(include_sfs: bool = True) -> list:
     })
 
     # -----------------------------------------------------------------------
-    # ⑤ ReliefFSelector + RandomForest
-    #    ReliefF cattura interazioni tra feature, quindi seleziona subset
-    #    diversi rispetto a MI. Il confronto ⑤ vs ③ permette di valutare
-    #    se le interazioni aggiungono valore per RF.
+    # ⑥ MutualInfoSelector + AdaBoost
+    # -----------------------------------------------------------------------
+    spazio.append({
+        "selector": [MutualInfoSelector()],
+        "selector__k":        randint(15, 40),
+        "model": [AdaBoostClassifier(random_state=42)],
+        "model__n_estimators": randint(50, 300),
+        "model__learning_rate": [0.01, 0.05, 0.1, 0.5, 1.0],
+        "model__estimator": [DecisionTreeClassifier(max_depth=1), 
+                             DecisionTreeClassifier(max_depth=2),
+                             DecisionTreeClassifier(max_depth=3)],
+    })
+
+    # -----------------------------------------------------------------------
+    # ⑦ ReliefFSelector + RandomForest
     # -----------------------------------------------------------------------
     spazio.append({
         "selector": [ReliefFSelector()],
         "selector__k":            randint(15, 40),
-        "selector__n_neighbors":  randint(5, 20),    # parametro specifico di ReliefF
-        "selector__n_samples":    [500, 1000, 2000], # trade-off velocità / accuratezza
+        "selector__n_neighbors":  randint(5, 20),
+        "selector__n_samples":    [500, 1000, 2000],
         "model": [RandomForestClassifier(random_state=42)],
         "model__n_estimators":    randint(100, 400),
         "model__max_depth":       [None, 10, 20, 30],
@@ -170,10 +183,7 @@ def _build_search_space(include_sfs: bool = True) -> list:
     })
 
     # -----------------------------------------------------------------------
-    # ⑥ ReliefFSelector + KNN
-    #    ReliefF è concettualmente allineato con KNN: entrambi usano il
-    #    concetto di vicinanza. Ci aspettiamo che sia la combinazione
-    #    più favorevole per KNN.
+    # ⑧ ReliefFSelector + KNN
     # -----------------------------------------------------------------------
     spazio.append({
         "selector": [ReliefFSelector()],
@@ -188,15 +198,28 @@ def _build_search_space(include_sfs: bool = True) -> list:
     })
 
     # -----------------------------------------------------------------------
-    # ⑦ EmbeddedDTSelector + RandomForest
-    #    La selezione embedded del DT + RF è concettualmente coerente:
-    #    entrambi sono tree-based. Le feature importanti per un DT tendono
-    #    ad esserlo anche per RF. Ci aspettiamo un buon risultato.
+    # ⑨ ReliefFSelector + AdaBoost
+    # -----------------------------------------------------------------------
+    spazio.append({
+        "selector": [ReliefFSelector()],
+        "selector__k":           randint(15, 40),
+        "selector__n_neighbors": randint(5, 20),
+        "selector__n_samples":   [500, 1000, 2000],
+        "model": [AdaBoostClassifier(random_state=42)],
+        "model__n_estimators": randint(50, 300),
+        "model__learning_rate": [0.01, 0.05, 0.1, 0.5, 1.0],
+        "model__estimator": [DecisionTreeClassifier(max_depth=1), 
+                             DecisionTreeClassifier(max_depth=2),
+                             DecisionTreeClassifier(max_depth=3)],
+    })
+
+    # -----------------------------------------------------------------------
+    # ⑩ EmbeddedDTSelector + RandomForest
     # -----------------------------------------------------------------------
     spazio.append({
         "selector": [EmbeddedDTSelector()],
         "selector__soglia":    ["mean", "median", 0.005, 0.01, 0.02],
-        "selector__max_depth": randint(8, 20),       # profondità del DT interno
+        "selector__max_depth": randint(8, 20),
         "model": [RandomForestClassifier(random_state=42)],
         "model__n_estimators":    randint(100, 400),
         "model__max_depth":       [None, 10, 20, 30],
@@ -205,10 +228,7 @@ def _build_search_space(include_sfs: bool = True) -> list:
     })
 
     # -----------------------------------------------------------------------
-    # ⑧ EmbeddedDTSelector + KNN
-    #    La selezione embedded del DT riduce la dimensionalità prima di KNN.
-    #    A differenza di MI, la soglia produce un numero variabile di feature,
-    #    quindi questo dizionario esplora un range implicito di dimensionalità.
+    # ⑪ EmbeddedDTSelector + KNN
     # -----------------------------------------------------------------------
     spazio.append({
         "selector": [EmbeddedDTSelector()],
@@ -222,17 +242,28 @@ def _build_search_space(include_sfs: bool = True) -> list:
     })
 
     # -----------------------------------------------------------------------
-    # ⑨ SFSSelector + RandomForest  (opzionale, lento)
-    #    SFS con DT interno + RF: la pipeline più onerosa. k basso e cv=2
-    #    per contenere il tempo. Ha senso includerla perché SFS costruisce
-    #    subset per massimizzare direttamente la metrica, diversamente dai
-    #    filter che usano proxy statistici.
+    # ⑫ EmbeddedDTSelector + AdaBoost
+    # -----------------------------------------------------------------------
+    spazio.append({
+        "selector": [EmbeddedDTSelector()],
+        "selector__soglia":    ["mean", "median", 0.005, 0.01, 0.02],
+        "selector__max_depth": randint(8, 20),
+        "model": [AdaBoostClassifier(random_state=42)],
+        "model__n_estimators": randint(50, 300),
+        "model__learning_rate": [0.01, 0.05, 0.1, 0.5, 1.0],
+        "model__estimator": [DecisionTreeClassifier(max_depth=1), 
+                             DecisionTreeClassifier(max_depth=2),
+                             DecisionTreeClassifier(max_depth=3)],
+    })
+
+    # -----------------------------------------------------------------------
+    # ⑬ SFSSelector + RandomForest
     # -----------------------------------------------------------------------
     if include_sfs:
         spazio.append({
             "selector": [SFSSelector()],
-            "selector__k":           randint(10, 25),   # k basso per velocità
-            "selector__cv":          [2, 3],             # cv minimo per velocità
+            "selector__k":           randint(10, 25),
+            "selector__cv":          [2, 3],
             "selector__max_depth_dt": randint(5, 12),
             "model": [RandomForestClassifier(random_state=42)],
             "model__n_estimators":    randint(100, 300),
@@ -241,10 +272,7 @@ def _build_search_space(include_sfs: bool = True) -> list:
         })
 
     # -----------------------------------------------------------------------
-    # ⑩ SFSSelector + KNN  (opzionale, lento)
-    #    SFS seleziona il subset che massimizza la f1_micro del DT interno,
-    #    non di KNN. Questo mismatch tra modello di selezione e modello
-    #    di classificazione è un limite noto di SFS — documentato nel report.
+    # ⑭ SFSSelector + KNN
     # -----------------------------------------------------------------------
     if include_sfs:
         spazio.append({
@@ -256,6 +284,23 @@ def _build_search_space(include_sfs: bool = True) -> list:
             "model__n_neighbors": randint(3, 25),
             "model__weights":     ["uniform", "distance"],
             "model__metric":      ["euclidean", "manhattan"],
+        })
+
+    # -----------------------------------------------------------------------
+    # ⑮ SFSSelector + AdaBoost
+    # -----------------------------------------------------------------------
+    if include_sfs:
+        spazio.append({
+            "selector": [SFSSelector()],
+            "selector__k":           randint(10, 25),
+            "selector__cv":          [2, 3],
+            "selector__max_depth_dt": randint(5, 12),
+            "model": [AdaBoostClassifier(random_state=42)],
+            "model__n_estimators": randint(50, 300),
+            "model__learning_rate": [0.01, 0.05, 0.1, 0.5, 1.0],
+            "model__estimator": [DecisionTreeClassifier(max_depth=1), 
+                                 DecisionTreeClassifier(max_depth=2),
+                                 DecisionTreeClassifier(max_depth=3)],
         })
 
     return spazio
