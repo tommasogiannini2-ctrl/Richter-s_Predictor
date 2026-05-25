@@ -1,5 +1,7 @@
 import os
 import pandas as pd
+import gc
+
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 
 from data_pipeline.preprocessing import Preprocessing, dividi_train_validation_test
@@ -42,7 +44,13 @@ if __name__ == "__main__":
         # quindi viene rimosso prima di qualsiasi elaborazione.
         dati_tot = train_values.merge(train_labels, on='building_id')
         dati_tot = dati_tot.drop('building_id', axis=1)
- 
+
+        #Da questo momento train_values e train_labels non servono più: liberiamo memoria.
+
+        del train_values
+        del train_labels
+        gc.collect()
+
         print(f"  {'File uniti su building_id.':<40}")
         print(f"  {'Righe totali:':<40} {dati_tot.shape[0]:>8,}")
         print(f"  {'Colonne totali:':<40} {dati_tot.shape[1]:>8}")
@@ -79,6 +87,9 @@ if __name__ == "__main__":
         print(f"  {'Validation:':<40} {len(dati_vali):>8,} righe ({len(dati_vali)/len(dati_tot):.0%})")
         print(f"  {'Test interno:':<40} {len(dati_test):>8,} righe ({len(dati_test)/len(dati_tot):.0%})")
         print(f"{'=' * 60}")
+
+        del dati_tot
+        gc.collect()
  
         # ====================================================================
         # FASE 5 — PREPROCESSING TRAIN SET
@@ -123,6 +134,11 @@ if __name__ == "__main__":
         # Salvataggio checkpoint del training set completamente processato.
         output_train_path = os.path.join(output_dir, 'train_processato.csv')
         df_train_processato.to_csv(output_train_path, index=False)
+
+        del dati_train
+        del X_train_clust
+        del train_clusters
+        gc.collect()
  
         print(f"\n{'=' * 60}")
         print(f"  RIEPILOGO TRAIN PROCESSATO")
@@ -194,6 +210,11 @@ if __name__ == "__main__":
         # Estrazione comoda dei due DataFrame processati
         df_val_processato  = df_processati["VALIDATION"]
         df_test_processato = df_processati["TEST"]
+
+        del dati_vali
+        del dati_test
+        del df_processati
+        gc.collect()
  
         # ====================================================================
         # FASE 8 — FEATURE SELECTION SEARCH (RandomizedSearchCV condizionale)
@@ -277,6 +298,11 @@ if __name__ == "__main__":
         df_train_finale.to_csv(os.path.join(output_dir, 'train_finale.csv'), index=False)
         df_val_finale.to_csv(os.path.join(output_dir,   'val_finale.csv'),   index=False)
         df_test_finale.to_csv(os.path.join(output_dir,  'test_finale.csv'),  index=False)
+
+        del df_train_processato, df_val_processato, df_test_processato
+        del X_train_fs, X_val_fs, X_test_fs
+        del X_train_sel, X_val_sel, X_test_sel
+        gc.collect()
  
         # ====================================================================
         # FASE 9 — PREPROCESSING E CLUSTERING DEL TEST UFFICIALE DRIVENDATA
