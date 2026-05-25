@@ -15,6 +15,7 @@ class DataCleaning:
         self.pulisci_variabili()
         if self.is_train:
             self.elimina_classnull()
+        self.rimuovi_outlier_strutturali()
         return self.df
 
     def elimina_duplicati(self):
@@ -64,6 +65,15 @@ class DataCleaning:
 
     def elimina_classnull(self):
         """Rimuove i record con target nullo."""
+        if self.is_train and 'damage_grade' in self.df.columns:
+            righe_prima = len(self.df)
+            self.df = self.df.dropna(subset=['damage_grade']).reset_index(drop=True)
+            rimossi = righe_prima - len(self.df)
+            if rimossi > 0:
+                print(f"  {'Record con target nullo rimossi:':<40} {rimossi:>8}")
+
+    def rimuovi_outlier_strutturali(self):
+        """Rimuove o imputa le anomalie strutturali."""
         print(f"\n  Controllo outlier strutturali")
         print(f"  {'-' * 48}")
  

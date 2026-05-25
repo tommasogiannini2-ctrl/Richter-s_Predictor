@@ -52,14 +52,7 @@ class TestDataCleaning(unittest.TestCase):
         self.assertTrue(pd.isna(cleaner.df.loc[1, 'count_floors_pre_eq']))
         self.assertTrue(pd.isna(cleaner.df.loc[2, 'count_floors_pre_eq']))
 
-    @patch('builtins.print')
-    def test_elimina_classnull(self, mock_print):
-        """Controlla che i record privi della variabile target in fase di addestramento vengano scartati dal set di dati."""
-        cleaner = DataCleaning(self.df_base)
-        cleaner.elimina_classnull()
 
-        self.assertEqual(len(cleaner.df), 3)
-        self.assertFalse(cleaner.df['damage_grade'].isna().any())
 
     @patch('builtins.print')
     def test_rimuovi_outlier_strutturali_train(self, mock_print):

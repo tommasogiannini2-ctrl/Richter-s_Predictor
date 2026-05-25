@@ -22,7 +22,8 @@ class TestDataImputation(unittest.TestCase):
             'area_percentage': [50, np.nan, 100, 75],  # Numerica con NaN
             'height_percentage': [10, 20, np.nan, 15],  # Numerica con NaN
             'roof_type': ['n', 'q', np.nan, 'n'],  # Categorica con NaN
-            'foundation_type': ['h', 'h', 'i', 'h']  # Categorica senza NaN
+            'foundation_type': ['h', 'h', 'i', 'h'],  # Categorica senza NaN
+            'has_superstructure_adobe_mud': [1, np.nan, 0, 1]  # Binaria con NaN
         })
 
     def test_init_copia_dataframe(self):
@@ -66,8 +67,9 @@ class TestDataImputation(unittest.TestCase):
         res_df = imputer.imputa()
 
         # Verifica che gli imputer siano stati creati e salvati nell'istanza
-        self.assertIsInstance(imputer.imputer_num, IterativeImputer)
+        self.assertIsInstance(imputer.imputer_num, SimpleImputer)
         self.assertIsInstance(imputer.imputer_cat, SimpleImputer)
+        self.assertIsInstance(imputer.imputer_bin, SimpleImputer)
 
         # Verifica l'avvenuta imputazione categorica (la moda di roof_type è 'n')
         self.assertEqual(res_df.loc[2, 'roof_type'], 'n')

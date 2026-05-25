@@ -29,7 +29,7 @@ class TestPreprocessing(unittest.TestCase):
         orchestrator = Preprocessing(self.df_base)
 
         self.assertTrue(orchestrator.is_train)
-        self.assertIsNotNone(orchestrator.scaler)
+        self.assertIsNone(orchestrator.scaler)
         self.assertEqual(orchestrator.colonne_eliminate, [])
         self.assertEqual(orchestrator.lista_colonne, [])
         self.assertIsNone(orchestrator.imputer_num)
