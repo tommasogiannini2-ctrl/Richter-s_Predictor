@@ -38,7 +38,7 @@ Output in output/:
 import argparse
 import os
 import sys
-import pickle
+import joblib # Sostituito pickle con joblib
 
 import numpy as np
 import pandas as pd
@@ -54,7 +54,7 @@ from model_evaluation.evaluation import ModelEvaluator
 # ===========================================================================
 
 def _build_model(
-    model: str,
+    model: str  = "rf",
     n_estimators: int  = 300,
     max_depth          = None,
     min_samples_leaf: int = 1,
@@ -130,6 +130,8 @@ def _build_model(
 def run(
     model: str        = "rf",
     output_dir: str   = "../output",
+    risultati_dir: str = None,
+    dataset_dir: str = None,
     no_proba: bool    = False,
     # iperparametri RF
     n_estimators: int = 300,
@@ -162,8 +164,11 @@ def run(
     Gli altri parametri sono iperparametri del modello scelto.
     """
     out_dir  = os.path.abspath(output_dir)
+    dataset_dir = dataset_dir or os.path.join(out_dir, 'dataset')
+    risultati_dir = risultati_dir or os.path.join(out_dir, 'risultati')
     eval_dir = os.path.join(out_dir, "eval")
-    os.makedirs(eval_dir, exist_ok=True)
+    for d in [dataset_dir, risultati_dir, eval_dir]:
+        os.makedirs(d, exist_ok=True)
 
     # ======================================================================
     # FASE 1 — CARICAMENTO DATASET FINALI
@@ -172,9 +177,9 @@ def run(
     print(f"  TRAINING — FASE 1: CARICAMENTO DATASET FINALI")
     print(f"{'=' * 60}")
 
-    path_train = os.path.join(out_dir, "train_finale.csv")
-    path_val   = os.path.join(out_dir, "val_finale.csv")
-    path_test  = os.path.join(out_dir, "test_finale.csv")
+    path_train = os.path.join(dataset_dir, "train_finale.csv")
+    path_val   = os.path.join(dataset_dir, "val_finale.csv")
+    path_test  = os.path.join(dataset_dir, "test_finale.csv")
 
     for p in [path_train, path_val, path_test]:
         if not os.path.exists(p):
@@ -233,11 +238,6 @@ def run(
     estimator.fit(X_train, y_train)
     print(f"  Addestramento completato.")
 
-    model_path = os.path.join(out_dir, "model_finale.pkl")
-    with open(model_path, "wb") as f:
-        pickle.dump(estimator, f)
-    print(f"  Modello salvato: {model_path}")
-
     # ======================================================================
     # FASE 3 — VALUTAZIONE SU VALIDATION SET
     # ======================================================================
@@ -256,6 +256,39 @@ def run(
     )
     metriche_val = evaluator_val.valuta_tutto()
     print(f"\n  [Validation] Micro-F1: {metriche_val['micro_f1']:.4f}")
+
+    # ======================================================================
+    # FASE 3.5 — SALVATAGGIO CONDIZIONALE DEL MODELLO MIGLIORE
+    # ======================================================================
+    print(f"\n{'=' * 60}")
+    print(f"  TRAINING — FASE 3.5: SALVATAGGIO CONDIZIONALE MODELLO")
+    print(f"{'=' * 60}")
+
+    model_path = os.path.join(risultati_dir, "model_finale.pkl")
+    best_score_path = os.path.join(risultati_dir, "model_finale_best_micro_f1.txt")
+    current_micro_f1 = metriche_val['micro_f1']
+
+    previous_best_micro_f1 = -1.0
+    if os.path.exists(best_score_path):
+        try:
+            with open(best_score_path, "r") as f:
+                previous_best_micro_f1 = float(f.read().strip())
+            print(f"  Score precedente (Micro-F1): {previous_best_micro_f1:.4f}")
+        except Exception as e:
+            print(f"  [Avviso] Errore nel leggere il best score precedente: {e}. Si assume -1.0.")
+
+    print(f"  Score attuale (Micro-F1): {current_micro_f1:.4f}")
+
+    if current_micro_f1 > previous_best_micro_f1:
+        print(f"  Nuovo miglior modello trovato! Salvataggio...")
+        joblib.dump(estimator, model_path)
+        with open(best_score_path, "w") as f:
+            f.write(str(current_micro_f1))
+        print(f"  Modello salvato: {model_path}")
+        print(f"  Nuovo miglior score salvato: {best_score_path}")
+    else:
+        print(f"  Il modello attuale ({current_micro_f1:.4f}) non è migliore del precedente ({previous_best_micro_f1:.4f}). Non salvato.")
+
 
     # ======================================================================
     # FASE 4 — VALUTAZIONE SU TEST SET INTERNO
@@ -290,7 +323,7 @@ def run(
 
     # Il test ufficiale è già completamente preprocessato da main.py
     # (scaling, imputation, clustering, feature selection) → caricato direttamente.
-    path_test_uff = os.path.join(out_dir, "test_ufficiale_processato.csv")
+    path_test_uff = os.path.join(dataset_dir, "test_ufficiale_processato.csv")
 
     if not os.path.exists(path_test_uff):
         print(f"  [Avviso] {path_test_uff} non trovato: submission saltata.")
@@ -309,7 +342,7 @@ def run(
             "building_id":  building_ids.values,
             "damage_grade": y_sub_pred,
         })
-        sub_path = os.path.join(out_dir, "submission.csv")
+        sub_path = os.path.join(risultati_dir, "submission.csv")
         submission.to_csv(sub_path, index=False)
 
         print(f"  Submission salvata: {sub_path}")
@@ -356,7 +389,7 @@ def _parse_args():
     parser.add_argument("--metric",           type=str, default="euclidean",
                         choices=["euclidean", "manhattan"])
     parser.add_argument("--learning-rate",    type=float, default=1.0)
-    parser.add_argument("--base-estimator-max-depth", type=int, default=1)
+    parser.add_argument("--base-estimator-max_depth", type=int, default=1)
     return parser.parse_args()
 
 

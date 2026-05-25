@@ -17,10 +17,14 @@ if __name__ == "__main__":
     current_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir    = os.path.join(current_dir, '..', 'data')
     output_dir  = os.path.join(current_dir, '..', 'output')
+
+    grafici_dir = os.path.join(output_dir, 'grafici')
+    dataset_dir = os.path.join(output_dir, 'dataset')
+    risultati_dir = os.path.join(output_dir, 'risultati')
  
     # Creazione della directory di output se non esiste
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    for d in [output_dir, grafici_dir, dataset_dir, risultati_dir]:
+        os.makedirs(d, exist_ok=True)
  
     try:
         # ====================================================================
@@ -61,7 +65,6 @@ if __name__ == "__main__":
         # ====================================================================
         # Il Plotter riceve il DataFrame GREZZO (prima dell'encoding) perché
         # plot_categoriche_vs_target() richiede le colonne stringa originali.
-        grafici_dir = os.path.join(output_dir, 'grafici')
         explorer = Plotter(dati_tot, output_dir=grafici_dir)
         explorer.esegui_tutto()
  
@@ -132,7 +135,7 @@ if __name__ == "__main__":
         )
  
         # Salvataggio checkpoint del training set completamente processato.
-        output_train_path = os.path.join(output_dir, 'train_processato.csv')
+        output_train_path = os.path.join(dataset_dir, 'train_processato.csv')
         df_train_processato.to_csv(output_train_path, index=False)
 
         del dati_train
@@ -193,7 +196,7 @@ if __name__ == "__main__":
             df_proc  = pd.concat([df_proc, clusters], axis=1)
  
             # Salvataggio checkpoint
-            output_path = os.path.join(output_dir, info["filename"])
+            output_path = os.path.join(dataset_dir, info["filename"])
             df_proc.to_csv(output_path, index=False)
  
             df_processati[label] = df_proc
@@ -220,7 +223,7 @@ if __name__ == "__main__":
         # FASE 8 — FEATURE SELECTION SEARCH (RandomizedSearchCV condizionale)
         # ====================================================================
         # Esplora lo spazio condizionale:
-        #   5 selettori × 2 modelli = fino a 10 dizionari di iperparametri
+        #   5 selettori × 3 modelli = fino a 15 dizionari di iperparametri
         #
         # La ricerca usa cross-validation INTERNA sul train set: il validation
         # rimane intatto per la valutazione finale, senza nessun data leakage.
@@ -245,7 +248,7 @@ if __name__ == "__main__":
         # include_sfs=True  → include SFSSelector (più lento, ~10 min in più)
         # include_sfs=False → esclude SFSSelector per test rapidi o macchine lente
         search = FeatureSelectionSearch(
-            n_iter=30,           # configurazioni totali da campionare
+            n_iter=10,           # configurazioni totali da campionare
             cv=3,                # fold di cross-validation interna
             include_sfs=True,    # False per test rapidi o macchine lente
             verbose=1,
@@ -257,7 +260,7 @@ if __name__ == "__main__":
         search.fit(X_train_fs, y_train_fs)
  
         # Salvataggio tabella completa dei risultati (utile per il report finale)
-        output_fs_path = os.path.join(output_dir, 'feature_selection_results.csv')
+        output_fs_path = os.path.join(risultati_dir, 'feature_selection_results.csv')
         search.get_results().to_csv(output_fs_path, index=False)
         print(f"  Risultati ricerca salvati in: {output_fs_path}")
  
@@ -295,9 +298,9 @@ if __name__ == "__main__":
             df_test_finale = X_test_sel
  
         # Salvataggio dataset finali pronti per train_model.py
-        df_train_finale.to_csv(os.path.join(output_dir, 'train_finale.csv'), index=False)
-        df_val_finale.to_csv(os.path.join(output_dir,   'val_finale.csv'),   index=False)
-        df_test_finale.to_csv(os.path.join(output_dir,  'test_finale.csv'),  index=False)
+        df_train_finale.to_csv(os.path.join(dataset_dir, 'train_finale.csv'), index=False)
+        df_val_finale.to_csv(os.path.join(dataset_dir,   'val_finale.csv'),   index=False)
+        df_test_finale.to_csv(os.path.join(dataset_dir,  'test_finale.csv'),  index=False)
 
         del df_train_processato, df_val_processato, df_test_processato
         del X_train_fs, X_val_fs, X_test_fs
@@ -357,7 +360,7 @@ if __name__ == "__main__":
         # Salvataggio del test ufficiale processato e pronto per la submission.
         # building_id viene incluso direttamente nel CSV: train_model.py lo leggerà
         # da qui senza dover rielaborare il file grezzo.
-        output_test_uff_path = os.path.join(output_dir, 'test_ufficiale_processato.csv')
+        output_test_uff_path = os.path.join(dataset_dir, 'test_ufficiale_finale.csv')
         df_test_uff_proc_con_id = df_test_uff_sel.copy()
         df_test_uff_proc_con_id.insert(
             0, 'building_id', building_ids_submission.values
@@ -417,7 +420,8 @@ if __name__ == "__main__":
             base_est = params_modello.pop('estimator')
             params_modello['base_estimator_max_depth'] = base_est.max_depth
 
-        avvia_training(model=nome_modello, output_dir=output_dir, **params_modello)
+        avvia_training(model=nome_modello, output_dir=output_dir, dataset_dir=dataset_dir,
+                       risultati_dir=risultati_dir, **params_modello)
  
     # ── GESTIONE ERRORI ───────────────────────────────────────────────────
     except Exception as ex:
