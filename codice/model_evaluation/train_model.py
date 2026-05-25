@@ -282,8 +282,6 @@ def run(
     if current_micro_f1 > previous_best_micro_f1:
         print(f"  Nuovo miglior modello trovato! Salvataggio...")
         joblib.dump(estimator, model_path)
-        with open(best_score_path, "w") as f:
-            f.write(str(current_micro_f1))
         print(f"  Modello salvato: {model_path}")
         print(f"  Nuovo miglior score salvato: {best_score_path}")
     else:
