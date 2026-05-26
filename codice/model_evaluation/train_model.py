@@ -3,36 +3,14 @@ train_model.py
 ==============
 Addestramento del modello finale e generazione predizioni per Richter's Predictor.
 
-Questo modulo espone due interfacce:
+Questo modulo espone tre interfacce:
 
-  1. run(...)  — funzione chiamabile programmaticamente da main.py
-                 (o da qualsiasi altro script) senza passare per argparse.
-
-  2. main()   — entry point CLI che legge gli argomenti da riga di comando
-                 e delega tutto a run().
-
-Flusso:
-  1. Carica i dataset finali prodotti da main.py (train_finale.csv, val_finale.csv,
-     test_finale.csv, test_ufficiale_finale.csv).
-  2. Addestra il modello scelto (RandomForest o KNN) sull'intero train_finale.
-  3. Valuta il modello su val_finale e test_finale usando ModelEvaluator.
-  4. Genera le predizioni finali per la submission DrivenData.
-  5. Salva metriche, grafici e submission.csv.
-
-Utilizzo da riga di comando (da codice/):
-  python model_evaluation/train_model.py [--model MODEL] [--output-dir DIR] [--no-proba]
-
-Opzioni:
-  --model MODEL     Modello: 'rf' (Random Forest, default) o 'knn'.
-  --output-dir DIR  Directory con i file prodotti da main.py (default: ../output).
-  --no-proba        Disabilita le probabilità (curve ROC). Utile con KNN.
-
-Output in output/eval/:
-  confusion_matrix.png, confusion_matrix_norm.png, roc_curves.png,
-  class_report.png, distribuzione_classi.png, metriche.csv
-
-Output in output/:
-  model_finale.pkl, submission.csv
+  1. run(...)         — funzione chiamabile programmaticamente da main.py
+                        per l'addestramento e la valutazione completa.
+  2. predict_only(...) — funzione chiamabile da main.py quando si salta il
+                        training per generare le predizioni partendo dal pkl.
+  3. main()           — entry point CLI che legge gli argomenti da riga di comando
+                        e delega tutto a run().
 """
 
 import argparse
@@ -148,20 +126,6 @@ def run(
 ):
     """
     Esegue l'intero flusso di training, valutazione e submission.
-
-    Può essere chiamata direttamente da main.py:
-        from model_evaluation.train_model import run as avvia_training
-        avvia_training(model='rf', output_dir=output_dir)
-
-    Parameters
-    ----------
-    model : str
-        'rf', 'knn' o 'ada'.
-    output_dir : str
-        Directory contenente i file prodotti da main.py.
-    no_proba : bool
-        Se True, salta il calcolo delle probabilità (curve ROC).
-    Gli altri parametri sono iperparametri del modello scelto.
     """
     out_dir  = os.path.abspath(output_dir)
     dataset_dir = dataset_dir or os.path.join(out_dir, 'dataset')
@@ -281,12 +245,24 @@ def run(
 
     if current_micro_f1 > previous_best_micro_f1:
         print(f"  Nuovo miglior modello trovato! Salvataggio...")
-        joblib.dump(estimator, model_path)
-        print(f"  Modello salvato: {model_path}")
+
+        # --- NUOVA LOGICA: SALVIAMO MODELLO + COLONNE SELEZIONATE ---
+        payload_da_salvare = {
+            "model": estimator,
+            "selected_features": X_train.columns.tolist()  # La mappa esatta delle feature scelte
+        }
+
+        joblib.dump(payload_da_salvare, model_path)
+        # -------------------------------------------------------------
+
+        # Aggiorna il file del punteggio
+        with open(best_score_path, "w") as f:
+            f.write(f"{current_micro_f1:.4f}")
+
+        print(f"  Modello e Feature Selection salvati in: {model_path}")
         print(f"  Nuovo miglior score salvato: {best_score_path}")
     else:
         print(f"  Il modello attuale ({current_micro_f1:.4f}) non è migliore del precedente ({previous_best_micro_f1:.4f}). Non salvato.")
-
 
     # ======================================================================
     # FASE 4 — VALUTAZIONE SU TEST SET INTERNO
@@ -319,8 +295,6 @@ def run(
     print(f"  TRAINING — FASE 5: GENERAZIONE SUBMISSION")
     print(f"{'=' * 60}")
 
-    # Il test ufficiale è già completamente preprocessato da main.py
-    # (scaling, imputation, clustering, feature selection) → caricato direttamente.
     path_test_uff = os.path.join(dataset_dir, "test_ufficiale_finale.csv")
 
     if not os.path.exists(path_test_uff):
@@ -330,7 +304,6 @@ def run(
         building_ids = df_test_uff["building_id"].copy()
 
         df_sub_prep = df_test_uff.drop(columns=["building_id"])
-        # allineamento difensivo alle colonne del train
         df_sub_prep = df_sub_prep.reindex(columns=X_train.columns, fill_value=0)
 
         print(f"  Predizione su {len(df_sub_prep):,} edifici...")
@@ -362,6 +335,82 @@ def run(
     print(f"{'=' * 60}\n")
 
     return metriche_val, metriche_test
+
+
+def predict_only(output_dir: str = "../output", risultati_dir: str = None, dataset_dir: str = None):
+    """
+    Carica il modello esistente salvato nel dizionario payload e genera
+    esclusivamente il file di submission a partire dal test ufficiale preprocessato.
+    """
+    out_dir = os.path.abspath(output_dir)
+    dataset_dir = dataset_dir or os.path.join(out_dir, 'dataset')
+    risultati_dir = risultati_dir or os.path.join(out_dir, 'risultati')
+
+    model_path = os.path.join(risultati_dir, "model_finale.pkl")
+    path_test_uff = os.path.join(dataset_dir, "test_ufficiale_finale.csv")
+
+    print(f"\n{'=' * 60}")
+    print(f"  MODE PREDICT-ONLY: GENERAZIONE SUBMISSION AGGIORNATA")
+    print(f"{'=' * 60}")
+
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Modello non trovato in: {model_path}. Impossibile predire senza modello.")
+    if not os.path.exists(path_test_uff):
+        raise FileNotFoundError(f"Dataset test ufficiale non trovato in: {path_test_uff}. Esegui prima main.py.")
+
+    print(f"  Caricamento del checkpoint: {model_path}...")
+    checkpoint = joblib.load(model_path)
+
+    # 1. Estrazione modello ed elenco feature storiche
+    if isinstance(checkpoint, dict) and "model" in checkpoint:
+        estimator = checkpoint["model"]
+        features_salvate = checkpoint["selected_features"]
+        print(f"  -> Modello {type(estimator).__name__} caricato correttamente dal dizionario.")
+    else:
+        print("  [ATTENZIONE] Il file pkl contiene solo il modello puro.")
+        estimator = checkpoint
+        features_salvate = None
+
+    # 2. Controllo difensivo fondamentale (Nativo di scikit-learn)
+    # Se il modello ha salvato le feature al fit time, usiamo QUELLE. Hanno la priorità assoluta.
+    if hasattr(estimator, "feature_names_in_"):
+        features_modello = estimator.feature_names_in_.tolist()
+        print(f"  -> Il Random Forest richiede esattamente queste {len(features_modello)} feature.")
+        features_finali = features_modello
+    elif features_salvate is not None:
+        features_finali = features_salvate
+    else:
+        raise ValueError(
+            "Impossibile determinare le feature originarie! Il file .pkl non contiene il dizionario "
+            "e l'oggetto RandomForest non ha l'attributo 'feature_names_in_'. Devi rifare un giro di training completo (T)."
+        )
+
+    # 3. Caricamento dati e pulizia building_id
+    df_test_uff = pd.read_csv(path_test_uff)
+    building_ids = df_test_uff["building_id"].copy()
+    df_sub_prep = df_test_uff.drop(columns=["building_id"], errors="ignore")
+
+    # 4. Forziamo il riallineamento totale delle colonne (ordine e presenza)
+    # Qualsiasi colonna in più (come age, area_percentage ecc.) viene buttata via.
+    # Qualsiasi colonna mancante viene creata piena di 0.
+    df_sub_prep = df_sub_prep.reindex(columns=features_finali, fill_value=0)
+
+    # 5. Predizione e output
+    print(f"  Predizione in corso su {len(df_sub_prep):,} edifici...")
+    y_sub_pred = estimator.predict(df_sub_prep)
+
+    submission = pd.DataFrame({
+        "building_id": building_ids.values,
+        "damage_grade": y_sub_pred,
+    })
+    sub_path = os.path.join(risultati_dir, "submission.csv")
+    submission.to_csv(sub_path, index=False)
+
+    print(f"  Submission salvata con successo in: {sub_path}")
+    print(f"  Distribuzione delle predizioni effettuate:")
+    for cls, cnt in submission["damage_grade"].value_counts().sort_index().items():
+        print(f"    Classe {cls}: {cnt:>7,} ({cnt / len(submission) * 100:.1f}%)")
+    print(f"{'=' * 60}\n")
 
 
 # ===========================================================================
