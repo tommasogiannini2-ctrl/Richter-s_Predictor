@@ -2,15 +2,37 @@ import pandas as pd
 
 
 class DataCleaning:
-    """Gestisce la pulizia del dataset."""
+    """
+    Gestione della pulizia e del filtraggio del dataset.
+    Raggruppa le operazioni di eliminazione duplicati, controllo range, 
+    gestione outlier e rimozione di righe/colonne con eccessivi valori nulli.
+    """
 
     def __init__(self, dataframe: pd.DataFrame, is_train: bool = True):
+        """
+        Inizializza la classe con il dataframe di input e lo stato di training.
+
+        Input:
+          - dataframe (pd.DataFrame): Il dataset da elaborare.
+          - is_train (bool, default=True): Indica se si opera sul set di training.
+
+        Output:
+          - Nessuno.
+        """
         self.df = dataframe.copy()
         self.is_train = is_train
         self.colonne_eliminate = []
 
     def pulisci(self) -> pd.DataFrame:
-        """Esegue tutte le operazioni di pulizia in sequenza."""
+        """
+        Esegue la sequenza completa di pulizia sul dataset.
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - pd.DataFrame: Il dataset pulito.
+        """
         self.elimina_duplicati()
         self.pulisci_variabili()
         if self.is_train:
@@ -20,7 +42,13 @@ class DataCleaning:
 
     def elimina_duplicati(self):
         """
-        Rimuove i record duplicati (solo in modalità TRAIN).
+        Rimuove i record identici dal dataset (eseguito solo in fase di training).
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - Nessuno (modifica il dataframe interno).
         """
         righe_prima = len(self.df)
 
@@ -34,7 +62,15 @@ class DataCleaning:
             print(f"  {'[TEST] Rimozione duplicati saltata (submission alignment):':<40} {righe_prima:>8} righe mantenute")
 
     def pulisci_variabili(self):
-        """Controlla e corregge i range delle variabili numeriche."""
+        """
+        Verifica e corregge i range di valori delle variabili numeriche note, convertendo in NaN i valori fuori dominio.
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - Nessuno (modifica il dataframe interno).
+        """
         print("\n  Controllo range variabili numeriche")
         print(f"  {'-' * 48}")
 
@@ -64,7 +100,15 @@ class DataCleaning:
             print(f"  {'families  (negativi)  NaN:':<40} {n:>8}")
 
     def elimina_classnull(self):
-        """Rimuove i record con target nullo."""
+        """
+        Rimuove i record privi dell'etichetta del target.
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - Nessuno (modifica il dataframe interno).
+        """
         if self.is_train and 'damage_grade' in self.df.columns:
             righe_prima = len(self.df)
             self.df = self.df.dropna(subset=['damage_grade']).reset_index(drop=True)
@@ -73,7 +117,16 @@ class DataCleaning:
                 print(f"  {'Record con target nullo rimossi:':<40} {rimossi:>8}")
 
     def rimuovi_outlier_strutturali(self):
-        """Rimuove o imputa le anomalie strutturali."""
+        """
+        Rileva e gestisce le anomalie strutturali o i valori fuori dominio per le variabili categoriche e binarie.
+        In fase di training i record anomali vengono rimossi, in fase di test vengono convertiti in NaN.
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - Nessuno (modifica il dataframe interno).
+        """
         print(f"\n  Controllo outlier strutturali")
         print(f"  {'-' * 48}")
  
@@ -122,7 +175,15 @@ class DataCleaning:
             print(f"  {'[TEST] Righe mantenute:':<40} {len(self.df):>8}")
 
     def elimina_record_null_percentuale(self, soglia_percentuale=0.30):
-        """Rimuove i record con troppi null."""
+        """
+        Rimuove i record che superano una determinata percentuale limite di valori nulli.
+
+        Input:
+          - soglia_percentuale (float, default=0.30): Quota massima di valori nulli consentiti per riga.
+
+        Output:
+          - Nessuno (modifica il dataframe interno).
+        """
         n_colonne = len(self.df.columns)
         min_valori_validi = int(n_colonne * (1 - soglia_percentuale))
  
@@ -132,7 +193,15 @@ class DataCleaning:
         print(f"  {'Record rimossi (soglia null ' + str(int(soglia_percentuale*100)) + '%):':<40} {rimossi:>8}")
 
     def elimina_colonne_nulle(self, soglia_percentuale=0.4):
-        """Rimuove le feature che superano la percentuale di null."""
+        """
+        Rimuove dal dataset le colonne che superano una quota limite di valori nulli.
+
+        Input:
+          - soglia_percentuale (float, default=0.40): Quota massima di valori nulli consentiti per colonna.
+
+        Output:
+          - Nessuno (modifica il dataframe interno e valorizza self.colonne_eliminate).
+        """
         n_righe_totali = len(self.df)
         limite_nulli = n_righe_totali * soglia_percentuale
  
@@ -148,7 +217,15 @@ class DataCleaning:
             print(f"  Tutte le feature rispettano la soglia del {int(soglia_percentuale * 100)}% di null.")
 
     def applica_colonne_eliminate(self, colonne: list):
-        """Elimina le colonne passate."""
+        """
+        Elimina dal dataset corrente una lista di colonne precedentemente escluse in fase di training.
+
+        Input:
+          - colonne (list): Lista dei nomi delle colonne da rimuovere.
+
+        Output:
+          - Nessuno (modifica il dataframe interno).
+        """
         colonne_presenti = [c for c in colonne if c in self.df.columns]
         if colonne_presenti:
             self.df.drop(columns=colonne_presenti, inplace=True)

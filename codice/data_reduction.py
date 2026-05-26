@@ -4,25 +4,47 @@ from sklearn.model_selection import train_test_split
 
 class DataReducer:
     """
-    Classe per la gestione della pesantezza del dataset.
-    Permette di campionare i dati in base all'occupazione di memoria,
-    mantenendo le proporzioni del target costanti (campionamento stratificato).
+    Gestione del campionamento stratificato per la riduzione del dataset.
+    Permette di ridurre l'occupazione di memoria del dataset salvaguardando
+    le proporzioni originarie delle classi del target.
     """
 
     def __init__(self, dataframe: pd.DataFrame):
+        """
+        Inizializza la classe predisponendo il dataframe e identificando la colonna target.
+
+        Input:
+          - dataframe (pd.DataFrame): Dataset da sottoporre a campionamento.
+
+        Output:
+          - Nessuno.
+        """
         self.df = dataframe.copy()
         self.target = 'damage_grade'
 
-    def get_info(self):
-        """Restituisce numero di record e memoria occupata in MB."""
+    def get_info(self) -> tuple:
+        """
+        Calcola e restituisce il numero di record e la dimensione in memoria del dataset.
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - tuple: Contiene (numero_di_righe, dimensione_in_megabyte).
+        """
         n_record = len(self.df)
         memoria_mb = self.df.memory_usage(deep=True).sum() / (1024 ** 2)
         return n_record, memoria_mb
 
-    def riduci_per_memoria(self, limite_mb: float):
+    def riduci_per_memoria(self, limite_mb: float) -> pd.DataFrame:
         """
-        Calcola la frazione necessaria per far rientrare il dataset nel limite
-        di MB e applica il campionamento stratificato.
+        Esegue il campionamento stratificato per far rientrare il dataset nel limite di memoria indicato.
+
+        Input:
+          - limite_mb (float): Valore massimo desiderato in MB per il dataset finale.
+
+        Output:
+          - pd.DataFrame: Dataset ridotto.
         """
         n_record, memoria_attuale = self.get_info()
 
@@ -44,8 +66,16 @@ class DataReducer:
         self.df = df_ridotto.reset_index(drop=True)
         return self.df
 
-    def interfaccia_utente(self):
-        """Gestisce il dialogo con l'utente per la riduzione."""
+    def interfaccia_utente(self) -> pd.DataFrame:
+        """
+        Gestisce l'interazione testuale con l'utente per decidere e configurare la riduzione del dataset.
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - pd.DataFrame: Il dataset (eventualmente ridotto).
+        """
         n, mem = self.get_info()
 
         print(f"\n{'=' * 60}")

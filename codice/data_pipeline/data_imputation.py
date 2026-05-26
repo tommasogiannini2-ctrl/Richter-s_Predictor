@@ -4,9 +4,27 @@ from sklearn.impute import IterativeImputer, SimpleImputer
 
 
 class DataImputation:
-    """Gestisce i valori mancanti con imputazione multivariata."""
+    """
+    Gestione dell'imputazione dei valori mancanti nel dataset.
+    Supporta l'imputazione mediante la moda ( SimpleImputer ) per variabili binarie
+    e categoriali, e mediante la mediana/MICE per le variabili numeriche continue,
+    prevenendo il data leakage tra training e test set.
+    """
 
     def __init__(self, dataframe: pd.DataFrame, imputer_num=None, imputer_bin=None, imputer_cat=None, is_train: bool = True):
+        """
+        Inizializza la classe predisponendo gli imputer ed escludendo le colonne di sistema.
+
+        Input:
+          - dataframe (pd.DataFrame): Dataset su cui effettuare l'imputazione.
+          - imputer_num (SimpleImputer/IterativeImputer, opzionale): Imputer per feature continue.
+          - imputer_bin (SimpleImputer, opzionale): Imputer per feature binarie (has_*).
+          - imputer_cat (SimpleImputer, opzionale): Imputer per feature categoriche (stringhe).
+          - is_train (bool, default=True): Flag che indica se siamo in fase di training o test.
+
+        Output:
+          - Nessuno.
+        """
         self.df = dataframe.copy()
         self.is_train = is_train
  
@@ -16,7 +34,15 @@ class DataImputation:
         self._escluse = {'building_id', 'damage_grade'}
 
     def imputa(self) -> pd.DataFrame:
-        """Esegue l'imputazione separata per numeriche e categoriche."""
+        """
+        Rileva e imputa i valori mancanti separatamente in base al tipo di feature.
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - pd.DataFrame: Dataset con i valori mancanti imputati.
+        """
         n_nan_prima = self.df.isnull().sum().sum()
         print(f"  {'NaN prima dell\'imputazione:':<40} {n_nan_prima:>8}")
  
@@ -50,6 +76,12 @@ class DataImputation:
                     hanno la propria strategia di imputazione (moda, non mediana,
                     perché la mediana potrebbe restituire 0.5 su dati sbilanciati)
         - col_cat : colonne di tipo object/string (le categoriche ancora non codificate)
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - tuple: Contiene (lista_colonne_continue, lista_colonne_binarie, lista_colonne_categoriche).
         """
         col_num, col_bin, col_cat = [], [], []
  
@@ -72,7 +104,16 @@ class DataImputation:
  
     def _imputa_gruppo(self, colonne: list, attr_name: str, strategy: str, label: str):
         """
-        Imputa un gruppo di colonne con la strategia specificata.
+        Esegue l'imputazione (SimpleImputer) per un gruppo specifico di colonne del dataset.
+
+        Input:
+          - colonne (list): Elenco dei nomi delle colonne da imputare.
+          - attr_name (str): Nome dell'attributo in cui salvare/leggere l'imputer ('imputer_num', etc.).
+          - strategy (str): Strategia di imputazione da applicare ('median', 'most_frequent').
+          - label (str): Etichetta descrittiva per la stampa a console.
+
+        Output:
+          - Nessuno (modifica il dataframe interno).
         """
         if self.is_train:
             imputer = SimpleImputer(strategy=strategy)

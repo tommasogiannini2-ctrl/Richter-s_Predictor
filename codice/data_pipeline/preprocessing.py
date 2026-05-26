@@ -12,7 +12,21 @@ class Preprocessing:
     Coordina in sequenza: pulizia, imputazione, encoding e standardizzazione.
     """
 
-    def __init__(self, dataframe: pd.DataFrame,scaler=None,imputer_num=None,imputer_bin=None,imputer_cat=None,colonne_eliminate=None,lista_colonne=None,is_train: bool = True):
+    def __init__(self, dataframe: pd.DataFrame, scaler=None, imputer_num=None, imputer_bin=None, imputer_cat=None, colonne_eliminate=None, lista_colonne=None, is_train: bool = True):
+        """
+        Inizializza l'orchestratore con il dataset, lo stato di training e gli scaler/imputer necessari.
+
+        Input:
+          - dataframe (pd.DataFrame): Dataset da preelaborare.
+          - scaler (StandardScaler, opzionale): Scaler da iniettare/addestrare.
+          - imputer_num, imputer_bin, imputer_cat (SimpleImputer, opzionali): Imputer per i diversi tipi di feature.
+          - colonne_eliminate (list, opzionale): Colonne escluse durante il training.
+          - lista_colonne (list, opzionale): Struttura finale delle colonne per l'allineamento.
+          - is_train (bool, default=True): Flag che indica se siamo in fase di training o test.
+
+        Output:
+          - Nessuno.
+        """
         self.df = dataframe.copy()
         self.is_train = is_train
 
@@ -24,7 +38,15 @@ class Preprocessing:
         self.lista_colonne = lista_colonne if lista_colonne is not None else []
 
     def esegui(self) -> pd.DataFrame:
-        """Esegue l'intera pipeline di preprocessing."""
+        """
+        Esegue la pipeline completa di preprocessing (pulizia, imputazione, encoding, standardizzazione).
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - pd.DataFrame: Il dataset preelaborato pronto per l'addestramento o la predizione.
+        """
         modalita = 'TRAIN' if self.is_train else 'TEST'
  
         print(f"\n{'=' * 60}")
@@ -107,6 +129,16 @@ class Preprocessing:
 
 
 def dividi_train_validation_test(df, target_column='damage_grade'):
+    """
+    Suddivide il dataset originario in Train (70%), Validation (15%) e Test (15%) in modo stratificato.
+
+    Input:
+      - df (pd.DataFrame): Dataset complessivo da partizionare.
+      - target_column (str, default='damage_grade'): Colonna target da usare per la stratificazione.
+
+    Output:
+      - tuple: Contiene (train_df, val_df, test_df).
+    """
     # Prepariamo la stratificazione se la colonna è fornita
     strat = df[target_column] if target_column else None
 

@@ -5,12 +5,36 @@ from sklearn.cluster import KMeans
 
 
 class Clustering:
+    """
+    Gestione del clustering dei dati tramite l'algoritmo K-Means.
+    Consente di ricavare feature sintetiche codificate in One-Hot a partire dai cluster.
+    """
     def __init__(self):
+        """
+        Inizializza la classe predisponendo gli attributi per il modello e il parametro K.
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - Nessuno.
+        """
         self.model = None
         self.k_ottimale = None
 
     def plot_elbow_method(self, train_df, max_k=10, sample_size=30000, output_dir=None):
-        """Trova il K ottimale usando solo i dati di Train."""
+        """
+        Calcola e visualizza la distorsione al variare di K per individuare il numero ottimale di cluster.
+
+        Input:
+          - train_df (pd.DataFrame): Dataset di training su cui stimare la distorsione.
+          - max_k (int, default=10): Numero massimo di cluster da testare.
+          - sample_size (int, default=30000): Dimensione del campione estratto per velocizzare il calcolo.
+          - output_dir (str, opzionale): Percorso della directory in cui salvare l'immagine del grafico.
+
+        Output:
+          - Nessuno.
+        """
         sample = train_df.sample(n=min(len(train_df), sample_size), random_state=42)
         distortions = []
         K_range = range(2, max_k + 1)
@@ -36,7 +60,16 @@ class Clustering:
             plt.close(fig)
 
     def fit(self, train_df, k):
-        """Addestra il modello e restituisce il One-Hot Encoding dei cluster."""
+        """
+        Addestra il modello K-Means sul dataset di training e restituisce i cluster codificati in One-Hot.
+
+        Input:
+          - train_df (pd.DataFrame): Dataset di training per l'addestramento.
+          - k (int): Numero di cluster da generare.
+
+        Output:
+          - pd.DataFrame: DataFrame con le colonne dummy associate ai cluster.
+        """
         self.k_ottimale = k
         self.model = KMeans(n_clusters=k, init='k-means++', n_init=10, random_state=42)
 
@@ -46,7 +79,15 @@ class Clustering:
         return pd.get_dummies(clusters, prefix='cluster', dtype=int)
 
     def predict(self, test_df):
-        """Assegna i dati ai cluster esistenti e restituisce il One-Hot Encoding."""
+        """
+        Assegna i nuovi record ai cluster esistenti e ne restituisce la codifica One-Hot.
+
+        Input:
+          - test_df (pd.DataFrame): Dataset di input da mappare sui cluster addestrati.
+
+        Output:
+          - pd.DataFrame: DataFrame con le colonne dummy associate ai cluster, allineate per forma.
+        """
         if self.model is None:
             raise Exception("Il modello non è stato addestrato. Esegui prima .fit()")
 

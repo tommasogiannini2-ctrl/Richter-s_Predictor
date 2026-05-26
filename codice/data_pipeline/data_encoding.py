@@ -2,14 +2,35 @@ import pandas as pd
 
 
 class DataEncoding:
-    """Gestisce l'encoding delle variabili categoriche."""
+    """
+    Gestione della codifica delle variabili categoriche del dataset.
+    Consente la trasformazione delle feature discrete in variabili dummy (One-Hot Encoding).
+    """
 
-    def __init__(self, dataframe: pd.DataFrame, is_train=True):
+    def __init__(self, dataframe: pd.DataFrame, is_train: bool = True):
+        """
+        Inizializza la classe con il dataframe e lo stato di training.
+
+        Input:
+          - dataframe (pd.DataFrame): Il dataset contenente le variabili da codificare.
+          - is_train (bool, default=True): Flag per distinguere se si opera sul train set o su test/validation.
+
+        Output:
+          - Nessuno.
+        """
         self.df = dataframe.copy()
         self.is_train = is_train
 
     def trasforma(self, lista_colonne: list = None) -> pd.DataFrame:
-        """Esegue l'encoding e allinea le colonne al train set (solo test)."""
+        """
+        Esegue la codifica One-Hot e allinea la struttura delle colonne a quella del set di training.
+
+        Input:
+          - lista_colonne (list, opzionale): Nomi delle colonne attese a cui allineare il dataframe.
+
+        Output:
+          - pd.DataFrame: Il dataset codificato e allineato.
+        """
         self.dummy()
 
         if not self.is_train and lista_colonne:
@@ -18,8 +39,16 @@ class DataEncoding:
 
         return self.df
 
-    def dummy(self):
-        """Trasforma le feature categoriche in dummy variables (One-Hot Encoding)."""
+    def dummy(self) -> None:
+        """
+        Applica la codifica dummy alle colonne categoriche specificate se presenti nel dataset.
+
+        Input:
+          - Nessuno.
+
+        Output:
+          - Nessuno (modifica il dataframe interno).
+        """
         feature_categoriche = [
             'land_surface_condition', 'foundation_type', 'roof_type',
             'ground_floor_type', 'other_floor_type', 'position',

@@ -1,39 +1,47 @@
 # 🏔️ Richter's Predictor — Earthquake Damage Prediction
 
 > Algoritmo di intelligenza artificiale per la predizione del livello di danno subito dagli edifici durante il terremoto di Gorkha (Nepal, 2015).
+> Sviluppato come progetto per il corso di Fondamenti di Intelligenza Artificiale (FIA).
 
 **Fonte competizione:**
 DrivenData. (2019). *Richter's Predictor: Modeling Earthquake Damage.*
 https://www.drivendata.org/competitions/57/nepal-earthquake/
 
+---
 
 ## 📝 Descrizione del problema
 
-L'obiettivo è predire la variabile **`damage_grade`**, che rappresenta il livello di danno subito da un edificio a seguito del terremoto di Gorkha (Nepal, 2015). Si tratta di un problema di **classificazione multi-classe ordinale** su tre livelli:
+L'obiettivo è predire la variabile **`damage_grade`**, che rappresenta il livello di danno subito da un edificio a seguito del terremoto di Gorkha. Si tratta di un problema di **classificazione multi-classe ordinale** su tre livelli:
 
 | Damage Grade | Descrizione |
 | :---: | :--- |
-| **1** | Danno lieve |
-| **2** | Danno medio |
-| **3** | Distruzione quasi totale |
+| **1** | Danno lieve / strutturalmente sicuro |
+| **2** | Danno medio / riparabile |
+| **3** | Distruzione quasi totale / inagibile |
 
-La metrica ufficiale della competizione è la **micro-averaged F1 score**.
+La metrica ufficiale di valutazione della competizione è la **micro-averaged F1 score**. Il benchmark di riferimento su DrivenData è di circa **0.75**.
+
+---
 
 ## ⚙️ Requisiti e installazione
 
-**Python richiesto:** 3.14 
+**Python richiesto:** >= 3.10 (consigliato 3.12/3.14)
 
 ### Installazione delle dipendenze
+
+Dalla root directory del progetto, installare le dipendenze necessarie:
 
 ```bash
 pip install -r requirements.txt
 ```
 
+Le librerie principali includono: `scikit-learn`, `pandas`, `numpy`, `matplotlib`, `seaborn`, e `joblib`.
+
 ---
 
 ## 📊 Struttura dei dati
 
-Il dataset contiene **39 colonne**: `building_id` (identificatore univoco) e 38 feature predittive.
+Il dataset originale contiene **39 colonne**: `building_id` (identificatore univoco) e 38 feature predittive.
 
 ### Feature principali
 
@@ -55,124 +63,144 @@ Il dataset contiene **39 colonne**: `building_id` (identificatore univoco) e 38 
 | `plan_configuration` | Cat | Configurazione planimetrica | a, c, d, f, m, n, o, q, s, u |
 | `legal_ownership_status` | Cat | Status legale di proprietà del terreno | a, r, v, w |
 | `count_families` | Int | Numero di famiglie nell'edificio | Intero |
-| `has_superstructure_*` | Binary | Materiale di costruzione della sovrastruttura | 0 / 1 |
-| `has_secondary_use_*` | Binary | Uso secondario dell'edificio | 0 / 1 |
+| `has_superstructure_*` | Binary | Materiali di costruzione della sovrastruttura (11 colonne) | 0 / 1 |
+| `has_secondary_use_*` | Binary | Uso secondario dell'edificio (10 colonne) | 0 / 1 |
 
 ---
 
-## ▶️ Istruzioni per l'esecuzione
+## 🛠️ Pipeline di Preprocessing e ML (`main.py`)
 
-### 1. Preprocessing completo (train + test)
+L'esecuzione del file principale coordina una pipeline end-to-end avanzata, strutturata in **10 Fasi distinte** per garantire la robustezza delle predizioni ed evitare qualsiasi fenomeno di *data leakage*.
 
 ```bash
-python main.py
+python codice/main.py
 ```
 
-All'avvio, il programma chiede interattivamente se ridurre la dimensione del dataset:
+### Le 10 Fasi della Pipeline:
 
+```mermaid
+graph TD
+    A[Fase 1: Caricamento Dati] --> B[Fase 2: EDA Automatica]
+    B --> C[Fase 3: Riduzione Dataset]
+    C --> D[Fase 4: Split Train/Val/Test]
+    D --> E[Fase 5: Preprocessing Train]
+    E --> F[Fase 6: Clustering K-Means]
+    F --> G[Fase 7: Preprocessing Val/Test]
+    G --> H[Fase 8: Feature Selection Search]
+    H --> I[Fase 9: Preprocessing Test Ufficiale]
+    I --> J[Fase 10: Training Finale & Eval]
 ```
---- ANALISI DIMENSIONI DATASET ---
-Record attuali: 260601
-Memoria occupata: 74.35 MB
 
-La dimensione del dataset è ottimale? (s/n):
-```
+#### ── FASE 1: Caricamento Dati
+Caricamento e unione di `Train_Values.csv` e `Train_Labels.csv` sulla chiave primaria `building_id`.
 
-**Opzioni di input:**
+#### ── FASE 2: Analisi Esplorativa (EDA)
+Generazione automatica di grafici statistici (es. distribuzione del target, correlazioni, grafici di dispersione) salvati in `output/grafici/`.
 
-| Input | Effetto |
-| :--- | :--- |
-| `s` | Prosegue con il dataset completo (260.601 record) |
-| `n` | Richiede il limite in MB da rispettare, poi esegue il campionamento stratificato |
+#### ── FASE 3: Riduzione Dataset (Interattiva)
+Un sistema di sicurezza analizza la RAM occupata dal dataset. L'utente può scegliere in modo interattivo se proseguire con il dataset completo (260.601 record) o indicare un limite in MB. In tal caso, viene eseguito un **campionamento stratificato** che riduce le dimensioni preservando esattamente le proporzioni originarie delle classi del target.
 
-> **Consiglio:** su macchine con RAM limitata, rispondere `n` e impostare un limite di 20–30 MB (circa 70.000–100.000 record). La stratificazione garantisce che le proporzioni delle classi rimangano invariate.
+#### ── FASE 4: Partizionamento Rigoroso
+Suddivisione del dataset in:
+* **Train Set** (60%) — Utilizzato per calcolare statistiche, addestrare scaler, imputer e modelli.
+* **Validation Set** (20%) — Utilizzato per l'ottimizzazione degli iperparametri e la selezione del modello.
+* **Test Set Interno** (20%) — Destinato esclusivamente alla valutazione finale delle performance *unseen*.
 
-**Output prodotti:**
+#### ── FASE 5: Preprocessing del Train Set (`data_pipeline/`)
+* **Pulizia (`data_cleaning.py`)**: Rimozione di duplicati; correzione di range numerici anomali (es. `age > 800` o negativi convertiti in NaN); gestione dei record con target nullo o con oltre il 30% di valori mancanti.
+* **Imputazione (`data_imputation.py`)**: Feature numeriche imputate tramite regressione multivariata (`IterativeImputer` MICE, max 10 iterazioni); feature categoriche imputate con la moda (`SimpleImputer` con strategia `most_frequent`).
+* **Encoding (`data_encoding.py`)**: Trasformazione delle 8 variabili categoriali in colonne dummy (One-Hot Encoding).
+* **Standardizzazione (`data_standardization.py`)**: Scalatura con `StandardScaler` (media 0, deviazione standard 1) delle feature continue.
 
-- `output/train_processato.csv` — training set pronto per l'addestramento
-- `output/test_processato.csv` — test set pronto per la predizione
+#### ── FASE 6: Feature Engineering tramite Clustering K-Means
+Addestramento dell'algoritmo K-Means sulle feature continue del Train. Il numero ottimale di cluster viene supportato visivamente dall'Elbow Method (grafico `clustering_elbow.png`). Ad ogni record vengono aggiunte colonne dummy rappresentanti il cluster di appartenenza (`cluster_0` ... `cluster_4`), arricchendo lo spazio delle feature.
 
-## 🔧 Pipeline di preprocessing
+#### ── FASE 7: Preprocessing & Clustering su Validation e Test Interno
+I dataset di Validation e Test vengono processati riutilizzando **esclusivamente gli estimatori precedentemente addestrati sul Train** (scaler, imputer, clusterer), garantendo l'assoluta assenza di *data leakage*.
 
-La pipeline viene eseguita automaticamente da `main.py` tramite la classe `Preprocessing`. Le fasi sono le seguenti:
+#### ── FASE 8: Feature Selection & Hyperparameter Search (`model_evaluation/validation.py`)
+Esecuzione di una ricerca combinatoria casuale condizionale (`FeatureSelectionSearch`, impostata di default su **100 iterazioni** e **Cross-Validation su 3 fold**):
+* **Filtri di Selezione provati**: SelectKBest (ANOVA), SelectFromModel (con alberi di decisione o modelli lineari), PCA, e SequentialFeatureSelector (SFS).
+* **Classificatori ottimizzati**: Random Forest, AdaBoost, e K-Nearest Neighbors (KNN).
+* **Barra di Caricamento Personalizzata**: Per evitare l'output caotico di Joblib a terminale, viene utilizzata una barra di progresso testuale personalizzata (`SimpleProgressBar`) ad alta precisione con timer integrato.
+Al termine, i dataset vengono filtrati includendo solo il miglior set di feature individuato e i risultati della ricerca vengono salvati in `feature_selection_results.csv`.
 
-### Fase 1 — Pulizia (`data_cleaning.py`)
+#### ── FASE 9: Preprocessing del Test Ufficiale DrivenData
+Il dataset ufficiale di competizione (`Test_Values.csv`) viene caricato, ripulito, imputato, codificato, arricchito con le feature di cluster e filtrato con lo stesso sottoinsieme di feature finali. Viene salvato come `test_ufficiale_finale.csv`.
 
-| Operazione | Dettaglio |
-| :--- | :--- |
-| Rimozione duplicati | Righe identiche eliminate |
-| Correzione range numerici | `age > 800` o `< 0` → NaN; `count_floors_pre_eq > 15` o `≤ 0` → NaN; percentuali fuori `(0, 100]` → NaN |
-| Rimozione record con target nullo | Solo sul train set |
-| Rimozione outlier strutturali | Record con valori categoriali fuori dominio eliminati (train) o convertiti in NaN (test) |
-| Eliminazione record con troppi null | Record con oltre il 30% di valori mancanti rimossi (solo train) |
-| Eliminazione colonne con troppi null | Colonne con oltre il 40% di valori mancanti rimosse (solo train) |
-
-### Fase 2 — Imputazione (`data_imputation.py`)
-
-| Tipo di feature | Strategia |
-| :--- | :--- |
-| Numeriche | `IterativeImputer` (regressione multivariata, max 10 iterazioni) |
-| Categoriche | `SimpleImputer` con strategia `most_frequent` (moda) |
-
-Sul **test set** vengono riapplicati gli imputer già addestrati sul train, evitando data leakage.
-
-### Fase 3 — Encoding (`data_encoding.py`)
-
-Le 8 variabili categoriali vengono trasformate in **dummy variables** (One-Hot Encoding senza drop della prima categoria). 
-
-### Fase 4 — Standardizzazione (`data_standardization.py`)
-
-Le 5 feature continue (`age`, `area_percentage`, `height_percentage`, `count_floors_pre_eq`, `count_families`) vengono standardizzate con `StandardScaler` (media 0, deviazione standard 1). Sul test si applica il `transform` dello scaler addestrato sul train.
-
-## 🔍 Interpretazione dei risultati
-
-### Metrica principale: Micro-F1
-
-La competizione valuta i modelli con la **micro-averaged F1 score**. Questo valore aggrega TP, FP e FN su tutte le classi prima di calcolare F1, dando peso uguale a ogni singola predizione. Un valore più alto è migliore; il benchmark di riferimento su DrivenData è circa **0.75**.
-
-### Cosa osservare nei grafici
-
-**Matrice di confusione normalizzata**
-Ogni cella mostra la percentuale di record della classe reale (riga) classificati nella classe predetta (colonna). La diagonale principale deve essere la più alta possibile. Errori comuni nel dataset Nepal: confusione tra classe 2 e classe 3, e scarso riconoscimento della classe 1 (minoritaria).
-
-**Curve ROC**
-Ogni curva mostra il trade-off tra TPR e FPR per una classe (approccio One-vs-Rest). Un'AUC vicina a 1.0 indica un'ottima separazione; AUC = 0.5 equivale a un classificatore casuale. La classe 1 (danno lieve) tende ad avere AUC inferiore per via dello squilibrio del dataset.
-
-**Bar chart Precision / Recall / F1**
-Permette di confrontare le prestazioni classe per classe. Se la barra del Recall è molto più bassa della Precision su una classe, il modello tende a non riconoscerla (troppi falsi negativi). La linea rossa tratteggiata indica la Micro-F1 globale come riferimento.
-
-**Distribuzione classi reali vs predette**
-Se le barre "Predetti" differiscono significativamente da quelle "Reali", il modello ha un bias sistematico verso alcune classi. In presenza di forte squilibrio (classe 1 è circa il 10% del dataset), considerare tecniche di bilanciamento come SMOTE o pesi di classe.
-
-### Squilibrio del dataset
-
-Il dataset è sbilanciato secondo questa distribuzione approssimativa:
-
-| Classe | % approssimativa |
-| :---: | :---: |
-| 1 — Danno lieve | ~10% |
-| 2 — Danno medio | ~57% |
-| 3 — Distruzione | ~33% |
-
-Questo squilibrio impatta le metriche per classe: la classe 1 sarà generalmente quella con F1 più bassa. La Micro-F1 riflette questa proporzione, mentre la Macro-F1 (media non pesata) può essere usata per valutare le prestazioni in modo più equo tra le classi.
+#### ── FASE 10: Training Finale e Valutazione Complessiva (`model_evaluation/train_model.py`)
+Addestramento del miglior modello emerso dalla Fase 8 su tutto il Train finale. 
+* **Salvataggio Condizionale**: Il modello viene serializzato in `model_finale.pkl` **solo se** la Micro-F1 ottenuta sul Validation Set supera il punteggio massimo registrato nelle esecuzioni precedenti.
+* **Valutazione Dettagliata**: Calcolo e salvataggio automatico di metriche, report testuali e grafici di performance (Confusion Matrix normalizzata, Curve ROC One-vs-Rest, Bar Chart di Precision/Recall/F1) separatamente per Validation e Test interno.
+* **Generazione Submission**: Creazione di `submission.csv` pronto da caricare su DrivenData.
 
 ---
 
-## 📐 Formato di submission
+## 📁 Struttura della Cartella `output/`
 
-Il file di submission deve essere un CSV con intestazione e due colonne:
+A seguito della riorganizzazione, l'albero di output si presenta strutturato per scopi specifici:
 
-| Colonna | Tipo | Descrizione |
+```
+output/
+├── dataset/
+│   ├── train_processato.csv          # Dati train preelaborati prima della selezione feature
+│   ├── val_processato.csv            # Dati validation preelaborati prima della selezione feature
+│   ├── test_processato.csv           # Dati test interni preelaborati prima della selezione feature
+│   ├── train_finale.csv              # Dati train ridotti alle sole feature selezionate
+│   ├── val_finale.csv                # Dati validation ridotti alle sole feature selezionate
+│   ├── test_finale.csv               # Dati test interni ridotti alle sole feature selezionate
+│   └── test_ufficiale_finale.csv     # Dataset ufficiale di test pronto per la predizione finale
+├── grafici/
+│   ├── eda_*.png                     # Grafici generati dall'analisi esplorativa (EDA)
+│   └── clustering_elbow.png          # Grafico del metodo dell'Elbow per K-Means
+├── risultati/
+│   ├── feature_selection_results.csv # Tabella CSV contenente tutte le combinazioni provate nella ricerca
+│   ├── model_finale.pkl              # Modello ottimale addestrato serializzato con joblib
+│   ├── model_finale_best_micro_f1.txt# Score Micro-F1 di riferimento per il salvataggio condizionale
+│   └── submission.csv                # File contenente le predizioni finali in formato DrivenData
+└── eval/
+    ├── validation/                   # Metriche e grafici delle performance sul Validation Set
+    └── test/                         # Metriche e grafici delle performance sul Test Set Interno
+```
+
+---
+
+## 🚀 Esecuzione Manuale del Modello Finale (`train_model.py`)
+
+Oltre al flusso automatico di `main.py`, è possibile addestrare, valutare e generare la submission per un modello specifico direttamente da riga di comando passando argomenti CLI personalizzati.
+
+```bash
+python codice/model_evaluation/train_model.py --model rf --n-estimators 300 --max-depth 15
+```
+
+### Parametri CLI Disponibili:
+
+| Parametro | Descrizione | Valori supportati (Default) |
 | :--- | :--- | :--- |
-| `building_id` | Int | Identificatore dal test set |
-| `damage_grade` | Int (1–3) | Livello di danno predetto |
-
-**Esempio:**
-```csv
-building_id,damage_grade
-1148,1
-5842,3
-2593,2
-```
+| `--model` | Seleziona il tipo di algoritmo da addestrare | `rf` (Random Forest), `knn` (K-Nearest Neighbors), `ada` (AdaBoost) |
+| `--output-dir` | Cartella principale per il salvataggio degli output | Percorso stringa (`../output`) |
+| `--no-proba` | Disabilita il calcolo delle probabilità di classe (ROC curves) | Flag presente/assente |
+| `--n-estimators` | Numero di alberi/stimatori (RF / AdaBoost) | Intero (`300`) |
+| `--max-depth` | Profondità massima degli alberi (RF) | Intero / `None` (`None`) |
+| `--min-samples-leaf`| Numero minimo di campioni in una foglia (RF) | Intero (`1`) |
+| `--class-weight` | Criterio di peso delle classi (RF) | `balanced`, `balanced_subsample`, `None` (`None`) |
+| `--n-neighbors` | Numero di vicini (KNN) | Intero (`7`) |
+| `--weights` | Funzione peso dei vicini (KNN) | `uniform`, `distance` (`distance`) |
+| `--metric` | Metrica di distanza (KNN) | `euclidean`, `manhattan` (`euclidean`) |
+| `--learning-rate` | Tasso di apprendimento (AdaBoost) | Float (`1.0`) |
+| `--base-estimator-max_depth`| Profondità massima del Decision Tree debole (AdaBoost) | Intero (`1`) |
 
 ---
+
+## 🔍 Interpretazione dei Risultati di Performance
+
+I risultati salvati nelle cartelle `output/eval/validation/` e `output/eval/test/` permettono una diagnostica avanzata del classificatore:
+
+1. **Matrice di Confusione Normalizzata (`confusion_matrix.png`)**
+   Mostra la percentuale di record di ciascuna classe reale (righe) classificati nelle tre classi predette (colonne). La diagonale indica la sensitività (Recall) per classe. Consente di visualizzare immediatamente se il modello tende a confondere la classe 2 con la classe 3 (danno elevato) o se ha difficoltà a identificare la classe minoritaria 1.
+   
+2. **Curve ROC One-vs-Rest (`roc_curves.png`)**
+   Rappresentano la dinamica di sensibilità rispetto alla specificità per ciascuna delle 3 classi. Un'Area Sotto la Curva (AUC) vicina a `1.0` indica un'ottima capacità di discriminazione. Di solito, la classe 1 ha l'AUC più bassa a causa dello sbilanciamento del dataset (rappresenta solo il ~10% dei dati complessivi).
+
+3. **Report delle Metriche per Classe (`metrics_summary.png`)**
+   Un grafico a barre che confronta visivamente **Precision**, **Recall** e **F1-Score** per ciascuna delle 3 classi di danno. La linea orizzontale tratteggiata indica il valore Micro-F1 globale, evidenziando se le prestazioni del modello sono omogenee o sbilanciate a sfavore di specifiche classi.
