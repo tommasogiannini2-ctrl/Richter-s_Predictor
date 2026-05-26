@@ -13,7 +13,7 @@ Questo modulo espone due interfacce:
 
 Flusso:
   1. Carica i dataset finali prodotti da main.py (train_finale.csv, val_finale.csv,
-     test_finale.csv, test_ufficiale_processato.csv).
+     test_finale.csv, test_ufficiale_finale.csv).
   2. Addestra il modello scelto (RandomForest o KNN) sull'intero train_finale.
   3. Valuta il modello su val_finale e test_finale usando ModelEvaluator.
   4. Genera le predizioni finali per la submission DrivenData.
@@ -321,7 +321,7 @@ def run(
 
     # Il test ufficiale è già completamente preprocessato da main.py
     # (scaling, imputation, clustering, feature selection) → caricato direttamente.
-    path_test_uff = os.path.join(dataset_dir, "test_ufficiale_processato.csv")
+    path_test_uff = os.path.join(dataset_dir, "test_ufficiale_finale.csv")
 
     if not os.path.exists(path_test_uff):
         print(f"  [Avviso] {path_test_uff} non trovato: submission saltata.")

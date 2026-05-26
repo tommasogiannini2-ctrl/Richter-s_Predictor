@@ -63,6 +63,85 @@ from model_evaluation.feature_select_extract import (
     EmbeddedDTSelector,
 )
 
+import sys
+import contextlib
+import joblib
+
+# ===========================================================================
+# BARRA DI PROGRESSO PERSONALIZZATA PER JOBLIB / RANDOMIZEDSEARCHCV
+# ===========================================================================
+
+import time
+
+class SimpleProgressBar:
+    """
+    Una semplice barra di progresso testuale visualizzabile a terminale.
+    Utilizza caratteri ASCII standard per evitare problemi di codifica.
+    """
+    def __init__(self, total: int, width: int = 100, stream=None):
+        self.total = total
+        self.width = width
+        self.completed = 0
+        self.stream = stream if stream is not None else sys.stdout
+        self.start_time = time.time()
+
+    def update(self, n: int = 1):
+        if self.completed >= self.total:
+            return
+        self.completed += n
+        if self.completed > self.total:
+            self.completed = self.total
+            
+        percent = (self.completed / self.total) * 100
+        filled_len = int(self.width * self.completed // self.total)
+        bar = '=' * filled_len + ' ' * (self.width - filled_len)
+        
+        elapsed = time.time() - self.start_time
+        
+        # Stampa su singola riga sullo stream originario con timer
+        self.stream.write(f"\r  [{bar}] {percent:3.0f}% ({self.completed}/{self.total} fold completati) in {elapsed:.1f}s")
+        self.stream.flush()
+
+    def close(self):
+        elapsed = time.time() - self.start_time
+        percent = 100
+        bar = '=' * self.width
+        # Riscriviamo la riga finale con il tempo totale effettivo e andiamo a capo
+        self.stream.write(f"\r  [{bar}] {percent:3.0f}% ({self.total}/{self.total} fold completati) in {elapsed:.1f}s\n")
+        self.stream.flush()
+
+
+@contextlib.contextmanager
+def simple_progress_joblib(total: int):
+    """
+    Un context manager che fa il monkey-patch temporaneo di joblib.parallel.BatchCompletionCallBack
+    per indirizzare le notifiche di completamento dei batch alla barra di progresso,
+    silenziando lo standard output durante la ricerca per evitare stampe concorrenti.
+    """
+    import os
+    original_stdout = sys.stdout
+    pbar = SimpleProgressBar(total=total, stream=original_stdout)
+    
+    class SimpleBatchCompletionCallback(joblib.parallel.BatchCompletionCallBack):
+        def __call__(self, *args, **kwargs):
+            pbar.update(n=self.batch_size)
+            return super().__call__(*args, **kwargs)
+
+    old_batch_callback = joblib.parallel.BatchCompletionCallBack
+    joblib.parallel.BatchCompletionCallBack = SimpleBatchCompletionCallback
+    
+    # Redirigiamo sys.stdout su devnull per silenziare tutti i print intermedi
+    devnull = open(os.devnull, "w")
+    sys.stdout = devnull
+    try:
+        pbar.update(n=0)  # Visualizza lo stato iniziale
+        yield pbar
+    finally:
+        sys.stdout = original_stdout
+        devnull.close()
+        joblib.parallel.BatchCompletionCallBack = old_batch_callback
+        pbar.close()
+
 
 # ===========================================================================
 # COSTRUZIONE DELLO SPAZIO DI RICERCA CONDIZIONALE
@@ -413,6 +492,12 @@ class FeatureSelectionSearch:
 
         # --- Spazio di ricerca condizionale ---
         spazio = _build_search_space(include_sfs=self.include_sfs)
+        # Disattiviamo la verbosità interna di tutti i selettori nello spazio di ricerca
+        for diz in spazio:
+            if "selector" in diz:
+                for sel in diz["selector"]:
+                    if hasattr(sel, "verbose"):
+                        sel.verbose = False
         n_dizionari = len(spazio)
         print(f"\n  Dizionari nello spazio di ricerca: {n_dizionari}")
         print(f"  Campionamenti medi per dizionario: ~{self.n_iter // n_dizionari}")
@@ -428,16 +513,24 @@ class FeatureSelectionSearch:
             cv=self.cv,
             n_jobs=self.n_jobs,
             random_state=self.random_state,
-            verbose=self.verbose,
+            verbose=0,           # Silenzioso (il progresso viene gestito dalla barra personalizzata)
             refit=True,          # riaddestra il migliore su tutto X_train
             error_score=np.nan,  # non interrompere la ricerca su errori isolati
         )
 
-        print(f"\n  Avvio RandomizedSearchCV...")
-        with warnings.catch_warnings():
-            # Sopprimiamo ConvergenceWarning e simili durante la ricerca
-            warnings.simplefilter("ignore")
-            self.search_.fit(X_train, y_train)
+        if self.verbose > 0:
+            print(f"\n  Avvio Feature Selection Search...")
+            total_evals = self.n_iter * self.cv
+            with simple_progress_joblib(total=total_evals):
+                with warnings.catch_warnings():
+                    # Sopprimiamo ConvergenceWarning e simili durante la ricerca
+                    warnings.simplefilter("ignore")
+                    self.search_.fit(X_train, y_train)
+        else:
+            with warnings.catch_warnings():
+                # Sopprimiamo ConvergenceWarning e simili durante la ricerca
+                warnings.simplefilter("ignore")
+                self.search_.fit(X_train, y_train)
 
         # --- Estrazione risultati ---
         self.best_pipeline_ = self.search_.best_estimator_
@@ -612,7 +705,7 @@ class FeatureSelectionSearch:
         # Escludiamo la colonna "params" (non serializzabile in CSV in modo pulito)
         df_save = self.results_df_.drop(columns=["params"], errors="ignore")
         df_save.to_csv(percorso, index=False)
-        print(f"  [CSV salvato] → {percorso}")
+        print(f"  [CSV salvato] -> {percorso}")
 
     def _verifica_fit(self):
         """Lancia RuntimeError se fit() non è stato ancora chiamato."""

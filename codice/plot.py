@@ -458,7 +458,7 @@ class Plotter:
             os.makedirs(self.output_dir, exist_ok=True)
             percorso = os.path.join(self.output_dir, nome_file)
             fig.savefig(percorso, dpi=150, bbox_inches="tight")
-            print(f"    → Salvato: {percorso}")
+            print(f"    -> Salvato: {percorso}")
             plt.close(fig)
         else:
             plt.show()

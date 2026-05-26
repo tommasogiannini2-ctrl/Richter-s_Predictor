@@ -94,12 +94,13 @@ class MutualInfoSelector(BaseEstimator, TransformerMixin):
         Seed per riproducibilità (la stima della MI usa componenti stocastiche).
     """
 
-    def __init__(self, k: int = 30, random_state: int = 42):
+    def __init__(self, k: int = 30, random_state: int = 42, verbose: bool = True):
         # IMPORTANTE: i parametri del costruttore devono avere lo stesso nome
         # degli attributi di istanza — requisito di BaseEstimator per
         # get_params() / set_params() che usa l'introspezione.
         self.k = k
         self.random_state = random_state
+        self.verbose = verbose
 
     def fit(self, X, y):
         """Calcola i punteggi MI e seleziona le top-k feature."""
@@ -123,8 +124,9 @@ class MutualInfoSelector(BaseEstimator, TransformerMixin):
         mask = selector.get_support()
         self.feature_names_selected_ = self.scores_.index[mask].tolist()
 
-        print(f"  [MutualInfo] {len(self.feature_names_selected_)}"
-              f"/{len(self.feature_names_in_)} feature selezionate (k={k_effettivo}).")
+        if self.verbose:
+            print(f"  [MutualInfo] {len(self.feature_names_selected_)}"
+                  f"/{len(self.feature_names_in_)} feature selezionate (k={k_effettivo}).")
         return self
 
     def transform(self, X):
@@ -178,12 +180,13 @@ class ReliefFSelector(BaseEstimator, TransformerMixin):
     """
 
     def __init__(self, k: int = 30, n_neighbors: int = 10,
-                 n_samples: int = 500, random_state: int = 42):
+                 n_samples: int = 500, random_state: int = 42, verbose: bool = True):
         super().__init__()
         self.k = k
         self.n_neighbors = n_neighbors
         self.n_samples = n_samples
         self.random_state = random_state
+        self.verbose = verbose
         self.scores_ = None
 
     def fit(self, x, y):
@@ -257,8 +260,9 @@ class ReliefFSelector(BaseEstimator, TransformerMixin):
         top_k_idx = np.argsort(pesi)[-k_effettivo:][::-1]   # decrescente
         self.feature_names_selected_ = [self.feature_names_in_[i] for i in top_k_idx]
 
-        print(f"  [ReliefF] {len(self.feature_names_selected_)}/{n_feature} feature selezionate "
-              f"(stimate su {n_campioni_usati} campioni).")
+        if self.verbose:
+            print(f"  [ReliefF] {len(self.feature_names_selected_)}/{n_feature} feature selezionate "
+                  f"(stimate su {n_campioni_usati} campioni).")
         return self
 
 
@@ -314,12 +318,13 @@ class SFSSelector(BaseEstimator, TransformerMixin):
     """
 
     def __init__(self, k: int = 20, cv: int = 3,
-                 max_depth_dt: int = 8, random_state: int = 42, n_jobs: int = -1):
+                 max_depth_dt: int = 8, random_state: int = 42, n_jobs: int = -1, verbose: bool = True):
         self.k = k
         self.cv = cv
         self.max_depth_dt = max_depth_dt
         self.random_state = random_state
         self.n_jobs = n_jobs
+        self.verbose = verbose
 
     def fit(self, X, y):
         """Esegue la ricerca sequenziale e memorizza le feature selezionate."""
@@ -340,15 +345,17 @@ class SFSSelector(BaseEstimator, TransformerMixin):
             n_jobs=self.n_jobs,
         )
 
-        print(f"  [SFS] Avvio (k={k_effettivo}, cv={self.cv})... "
-              f"(può richiedere qualche minuto)")
+        if self.verbose:
+            print(f"  [SFS] Avvio (k={k_effettivo}, cv={self.cv})... "
+                  f"(può richiedere qualche minuto)")
         sfs.fit(X, y)
 
         mask = sfs.get_support()
         self.feature_names_selected_ = pd.Index(self.feature_names_in_)[mask].tolist()
 
-        print(f"  [SFS] {len(self.feature_names_selected_)}"
-              f"/{len(self.feature_names_in_)} feature selezionate.")
+        if self.verbose:
+            print(f"  [SFS] {len(self.feature_names_selected_)}"
+                  f"/{len(self.feature_names_in_)} feature selezionate.")
         return self
 
     def transform(self, X):
@@ -402,10 +409,11 @@ class EmbeddedDTSelector(BaseEstimator, TransformerMixin):
         Seed.
     """
 
-    def __init__(self, soglia="mean", max_depth: int = 12, random_state: int = 42):
+    def __init__(self, soglia="mean", max_depth: int = 12, random_state: int = 42, verbose: bool = True):
         self.soglia = soglia
         self.max_depth = max_depth
         self.random_state = random_state
+        self.verbose = verbose
 
     def fit(self, X, y):
         """Allena il DT, calcola le importanze e applica la soglia."""
@@ -439,12 +447,14 @@ class EmbeddedDTSelector(BaseEstimator, TransformerMixin):
         # Safety net: se la soglia elimina tutto, teniamo le top-10.
         # Evita crash a valle quando il selettore restituisce 0 colonne.
         if len(self.feature_names_selected_) == 0:
-            print(f"  [EmbeddedDT] Soglia troppo aggressiva → fallback top-10.")
+            if self.verbose:
+                print(f"  [EmbeddedDT] Soglia troppo aggressiva -> fallback top-10.")
             self.feature_names_selected_ = importanze.nlargest(10).index.tolist()
 
-        print(f"  [EmbeddedDT] {len(self.feature_names_selected_)}"
-              f"/{len(self.feature_names_in_)} feature selezionate "
-              f"(soglia={soglia_val:.5f}).")
+        if self.verbose:
+            print(f"  [EmbeddedDT] {len(self.feature_names_selected_)}"
+                  f"/{len(self.feature_names_in_)} feature selezionate "
+                  f"(soglia={soglia_val:.5f}).")
         return self
 
     def transform(self, X):

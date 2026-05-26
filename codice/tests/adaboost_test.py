@@ -81,7 +81,7 @@ class TestAdaBoostIntegration(unittest.TestCase):
         df_train.to_csv(os.path.join(self.test_dir, "train_finale.csv"), index=False)
         df_val.to_csv(os.path.join(self.test_dir, "val_finale.csv"), index=False)
         df_test.to_csv(os.path.join(self.test_dir, "test_finale.csv"), index=False)
-        df_uff.to_csv(os.path.join(self.test_dir, "test_ufficiale_processato.csv"), index=False)
+        df_uff.to_csv(os.path.join(self.test_dir, "test_ufficiale_finale.csv"), index=False)
 
         # 2. Esecuzione della funzione run (il cuore del training finale)
         # Usiamo parametri ridotti per velocità
@@ -89,6 +89,8 @@ class TestAdaBoostIntegration(unittest.TestCase):
             run_training(
                 model="ada",
                 output_dir=self.test_dir,
+                dataset_dir=self.test_dir,
+                risultati_dir=self.test_dir,
                 n_estimators=10,
                 learning_rate=1.0,
                 base_estimator_max_depth=1,

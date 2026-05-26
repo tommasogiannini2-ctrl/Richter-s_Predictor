@@ -248,7 +248,7 @@ if __name__ == "__main__":
         # include_sfs=True  → include SFSSelector (più lento, ~10 min in più)
         # include_sfs=False → esclude SFSSelector per test rapidi o macchine lente
         search = FeatureSelectionSearch(
-            n_iter=10,           # configurazioni totali da campionare
+            n_iter=100,           # configurazioni totali da campionare
             cv=3,                # fold di cross-validation interna
             include_sfs=True,    # False per test rapidi o macchine lente
             verbose=1,
@@ -405,7 +405,7 @@ if __name__ == "__main__":
             nome_modello = 'knn'
 
         print(f"\n  Modello migliore dalla feature selection search: "
-              f"{type(best_model_obj).__name__} → avvio training finale...")
+              f"{type(best_model_obj).__name__} -> avvio training finale...")
 
         # Estrazione degli iperparametri del modello migliore per passarli a avvia_training.
         # RandomizedSearchCV salva i parametri con il prefisso 'model__'.

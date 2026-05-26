@@ -29,7 +29,7 @@ class Clustering:
             os.makedirs(output_dir, exist_ok=True)
             percorso = os.path.join(output_dir, 'clustering_elbow.png')
             fig.savefig(percorso, dpi=150, bbox_inches='tight')
-            print(f"    → Salvato: {percorso}")
+            print(f"    -> Salvato: {percorso}")
             plt.close(fig)
         else:
             plt.show()

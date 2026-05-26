@@ -334,7 +334,7 @@ class ModelEvaluator:
             # Scrivi metriche per classe
             pd.DataFrame(righe_per_classe).to_csv(f, index=False)
 
-        print(f"  [CSV salvato] → {percorso}")
+        print(f"  [CSV salvato] -> {percorso}")
 
     # -----------------------------------------------------------------------
     # GRAFICO 1: Matrice di Confusione
@@ -633,7 +633,7 @@ class ModelEvaluator:
             os.makedirs(self.output_dir, exist_ok=True)
             percorso = os.path.join(self.output_dir, nome_file)
             fig.savefig(percorso, dpi=150, bbox_inches="tight")
-            print(f"  [Grafico salvato] → {percorso}")
+            print(f"  [Grafico salvato] -> {percorso}")
             plt.close(fig)
         else:
             plt.show()
