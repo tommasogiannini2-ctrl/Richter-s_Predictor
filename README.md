@@ -191,16 +191,3 @@ python codice/model_evaluation/train_model.py --model rf --n-estimators 300 --ma
 | `--base-estimator-max_depth`| Profondità massima del Decision Tree debole (AdaBoost) | Intero (`1`) |
 
 ---
-
-## 🔍 Interpretazione dei Risultati di Performance
-
-I risultati salvati nelle cartelle `output/eval/validation/` e `output/eval/test/` permettono una diagnostica avanzata del classificatore:
-
-1. **Matrice di Confusione Normalizzata (`confusion_matrix.png`)**
-   Mostra la percentuale di record di ciascuna classe reale (righe) classificati nelle tre classi predette (colonne). La diagonale indica la sensitività (Recall) per classe. Consente di visualizzare immediatamente se il modello tende a confondere la classe 2 con la classe 3 (danno elevato) o se ha difficoltà a identificare la classe minoritaria 1.
-   
-2. **Curve ROC One-vs-Rest (`roc_curves.png`)**
-   Rappresentano la dinamica di sensibilità rispetto alla specificità per ciascuna delle 3 classi. Un'Area Sotto la Curva (AUC) vicina a `1.0` indica un'ottima capacità di discriminazione. Di solito, la classe 1 ha l'AUC più bassa a causa dello sbilanciamento del dataset (rappresenta solo il ~10% dei dati complessivi).
-
-3. **Report delle Metriche per Classe (`metrics_summary.png`)**
-   Un grafico a barre che confronta visivamente **Precision**, **Recall** e **F1-Score** per ciascuna delle 3 classi di danno. La linea orizzontale tratteggiata indica il valore Micro-F1 globale, evidenziando se le prestazioni del modello sono omogenee o sbilanciate a sfavore di specifiche classi.
