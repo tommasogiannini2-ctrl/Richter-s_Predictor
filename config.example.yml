@@ -1,0 +1,24 @@
+# Esecuzione completa non interattiva della pipeline.
+# Uso:
+#   python codice/main.py --config config.example.yml
+
+run:
+  # true: usa model_finale.pkl se esiste; false: rifà preprocessing, ricerca e training.
+  use_saved_model: false
+
+data_reduction:
+  # true: riduce il dataset in base a max_memory_mb; false: usa il dataset completo.
+  enabled: true
+  max_memory_mb: 4.0
+
+clustering:
+  k: 5
+  elbow_max_k: 10
+  elbow_sample_size: 30000
+
+feature_selection:
+  n_iter: 10
+  cv: 3
+  include_sfs: true
+  verbose: 1
+

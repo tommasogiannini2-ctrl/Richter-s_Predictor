@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 import pandas as pd
@@ -14,6 +15,7 @@ try:
     from codice.data_pipeline.preprocessing import Preprocessing, dividi_train_validation_test
     from codice.data_pipeline.file_opener import scegli_opener
     from codice.data_pipeline.data_standardization import COLONNE_CONTINUE
+    from codice.config_loader import get_nested, load_config
     from codice.data_reduction import DataReducer
     from codice.plot import Plotter
     from codice.data_pipeline.clustering import Clustering
@@ -24,6 +26,7 @@ except ModuleNotFoundError:
     from data_pipeline.preprocessing import Preprocessing, dividi_train_validation_test
     from data_pipeline.file_opener import scegli_opener
     from data_pipeline.data_standardization import COLONNE_CONTINUE
+    from config_loader import get_nested, load_config
     from data_reduction import DataReducer
     from plot import Plotter
     from data_pipeline.clustering import Clustering
@@ -31,6 +34,12 @@ except ModuleNotFoundError:
     from model_evaluation.train_model import run as avvia_training
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Pipeline Richter's Predictor")
+    parser.add_argument("--config", type=str, default=None, help="Percorso a un file YAML per esecuzione non interattiva.")
+    args = parser.parse_args()
+    config = load_config(args.config)
+    non_interattivo = bool(config)
+
     current_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(current_dir, '..', 'data')
     output_dir = os.path.join(current_dir, '..', 'output')
@@ -51,10 +60,15 @@ if __name__ == "__main__":
         print(f"\n{'=' * 60}")
         print(f"  MODELLO FINALE INTEGRATO TROVATO")
         print(f"{'=' * 60}")
-        scelta = input(
-            "  È stato trovato un modello pre-addestrato (include Feature Selection).\n"
-            "  Vuoi usarlo per elaborare i dati (S) o rifare la ricerca completa (T)? [S/T]: "
-        ).strip().upper()
+        if non_interattivo:
+            use_saved_model = bool(get_nested(config, "run.use_saved_model", False))
+            scelta = "S" if use_saved_model else "T"
+            print(f"  Config YAML: run.use_saved_model={use_saved_model} -> scelta {scelta}")
+        else:
+            scelta = input(
+                "  È stato trovato un modello pre-addestrato (include Feature Selection).\n"
+                "  Vuoi usarlo per elaborare i dati (S) o rifare la ricerca completa (T)? [S/T]: "
+            ).strip().upper()
 
         if scelta == 'S':
             eseguire_training_completo = False
@@ -95,7 +109,15 @@ if __name__ == "__main__":
         # ====================================================================
         if eseguire_training_completo:
             reducer = DataReducer(dati_tot)
-            dati_tot = reducer.interfaccia_utente()
+            if non_interattivo:
+                reduction_enabled = bool(get_nested(config, "data_reduction.enabled", False))
+                if reduction_enabled:
+                    limite_mb = float(get_nested(config, "data_reduction.max_memory_mb"))
+                    dati_tot = reducer.riduci_per_memoria(limite_mb)
+                else:
+                    print("  Config YAML: data_reduction.enabled=false -> nessuna riduzione applicata.")
+            else:
+                dati_tot = reducer.interfaccia_utente()
 
         # ====================================================================
         # FASE 4 — SPLIT INTERNO: TRAIN / VALIDATION / TEST
@@ -128,9 +150,14 @@ if __name__ == "__main__":
         engine = Clustering()
 
         if eseguire_training_completo:
-            engine.plot_elbow_method(X_train_clust, output_dir=grafici_dir)
+            engine.plot_elbow_method(
+                X_train_clust,
+                max_k=int(get_nested(config, "clustering.elbow_max_k", 10)),
+                sample_size=int(get_nested(config, "clustering.elbow_sample_size", 30000)),
+                output_dir=grafici_dir
+            )
 
-        k_scelto = 5
+        k_scelto = int(get_nested(config, "clustering.k", 5))
         train_clusters = engine.fit(X_train_clust, k=k_scelto)
         df_train_processato = pd.concat([df_train_processato, train_clusters], axis=1)
 
@@ -185,7 +212,13 @@ if __name__ == "__main__":
             # CASO A: Training completo (Lancia la ricerca RandomizedSearchCV)
             # ----------------------------------------------------------------
             print("  [TRAIN=TRUE] Avvio ricerca spaziale FeatureSelectionSearch...")
-            search = FeatureSelectionSearch(n_iter=10, cv=3, include_sfs=True, verbose=1, output_dir=None)
+            search = FeatureSelectionSearch(
+                n_iter=int(get_nested(config, "feature_selection.n_iter", 10)),
+                cv=int(get_nested(config, "feature_selection.cv", 3)),
+                include_sfs=bool(get_nested(config, "feature_selection.include_sfs", True)),
+                verbose=int(get_nested(config, "feature_selection.verbose", 1)),
+                output_dir=None
+            )
             search.fit(X_train_fs, y_train_fs)
 
             output_fs_path = os.path.join(risultati_dir, 'feature_selection_results.csv')

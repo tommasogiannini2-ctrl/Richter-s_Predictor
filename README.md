@@ -82,6 +82,18 @@ In alternativa, dalla root del repository:
 python -m codice.main
 ```
 
+Per eseguire la pipeline completa senza prompt interattivi, usare un file YAML:
+
+```bash
+python codice/main.py --config config.example.yml
+```
+
+Le opzioni principali configurabili sono:
+* `run.use_saved_model`: usa `model_finale.pkl` se disponibile (`true`) oppure forza una nuova ricerca/training (`false`).
+* `data_reduction.enabled` e `data_reduction.max_memory_mb`: controllano la riduzione stratificata del dataset.
+* `clustering.k`, `clustering.elbow_max_k`, `clustering.elbow_sample_size`: controllano K-Means e grafico Elbow.
+* `feature_selection.n_iter`, `feature_selection.cv`, `feature_selection.include_sfs`, `feature_selection.verbose`: controllano la ricerca di feature selection.
+
 ### Le 10 Fasi della Pipeline:
 
 ```mermaid
