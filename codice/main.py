@@ -13,6 +13,7 @@ try:
     from codice.model_evaluation.train_model import predict_only
     from codice.data_pipeline.preprocessing import Preprocessing, dividi_train_validation_test
     from codice.data_pipeline.file_opener import scegli_opener
+    from codice.data_pipeline.data_standardization import COLONNE_CONTINUE
     from codice.data_reduction import DataReducer
     from codice.plot import Plotter
     from codice.data_pipeline.clustering import Clustering
@@ -22,6 +23,7 @@ except ModuleNotFoundError:
     from model_evaluation.train_model import predict_only
     from data_pipeline.preprocessing import Preprocessing, dividi_train_validation_test
     from data_pipeline.file_opener import scegli_opener
+    from data_pipeline.data_standardization import COLONNE_CONTINUE
     from data_reduction import DataReducer
     from plot import Plotter
     from data_pipeline.clustering import Clustering
@@ -118,7 +120,11 @@ if __name__ == "__main__":
         # ====================================================================
         # FASE 6 — CLUSTERING SUL TRAIN SET
         # ====================================================================
-        X_train_clust = df_train_processato.drop(columns=['damage_grade'])
+        colonne_clustering = [col for col in COLONNE_CONTINUE if col in df_train_processato.columns]
+        if not colonne_clustering:
+            raise ValueError("Nessuna feature continua disponibile per il clustering K-Means.")
+
+        X_train_clust = df_train_processato[colonne_clustering]
         engine = Clustering()
 
         if eseguire_training_completo:
@@ -150,7 +156,7 @@ if __name__ == "__main__":
                 colonne_eliminate=colonne_eliminate, lista_colonne=lista_colonne_train, is_train=False
             )
             df_proc = pp.esegui()
-            X_proc = df_proc.drop(columns=['damage_grade'])
+            X_proc = df_proc[colonne_clustering]
             clusters = engine.predict(X_proc)
             df_proc = pd.concat([df_proc, clusters], axis=1)
             df_proc.to_csv(os.path.join(dataset_dir, info["filename"]), index=False)
@@ -255,7 +261,7 @@ if __name__ == "__main__":
         )
         df_test_uff_proc = pp_test_uff.esegui()
 
-        clusters_test_uff = engine.predict(df_test_uff_proc)
+        clusters_test_uff = engine.predict(df_test_uff_proc[colonne_clustering])
         df_test_uff_proc = pd.concat([df_test_uff_proc, clusters_test_uff], axis=1)
 
         # ─── MODIFICA QUI: APPLICAZIONE DEL SELETTORE O DIZIONARIO ───────────

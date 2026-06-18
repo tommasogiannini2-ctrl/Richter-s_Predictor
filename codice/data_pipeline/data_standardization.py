@@ -2,6 +2,15 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 
+COLONNE_CONTINUE = [
+    'age',
+    'area_percentage',
+    'height_percentage',
+    'count_floors_pre_eq',
+    'count_families'
+]
+
+
 class DataScaling:
     """
     Standardizzazione delle feature numeriche continue del dataset tramite StandardScaler.
@@ -39,15 +48,7 @@ class DataScaling:
         Output:
           - pd.DataFrame: Dataset standardizzato.
         """
-        colonne_continue = [
-            'age',
-            'area_percentage',
-            'height_percentage',
-            'count_floors_pre_eq',
-            'count_families'
-        ]
-
-        colonne_da_standardizzare = [col for col in colonne_continue if col in self.df.columns]
+        colonne_da_standardizzare = [col for col in COLONNE_CONTINUE if col in self.df.columns]
 
         if not colonne_da_standardizzare:
             print(f"  Nessuna colonna continua trovata: standardizzazione saltata.")

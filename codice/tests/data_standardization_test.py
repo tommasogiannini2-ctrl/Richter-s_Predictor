@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 from sklearn.preprocessing import StandardScaler
-from data_pipeline.data_standardization import DataScaling
+from data_pipeline.data_standardization import COLONNE_CONTINUE, DataScaling
 
 
 class TestDataScaling(unittest.TestCase):
@@ -61,6 +61,19 @@ class TestDataScaling(unittest.TestCase):
         # Le colonne standardizzate devono contenere i nuovi valori dell'array mockato
         self.assertEqual(list(res_df['age']), [-1, 1, 0])
         self.assertEqual(list(res_df['area_percentage']), [-1, 1, 0])
+
+    def test_colonne_continue_condivise_per_scaling_e_clustering(self):
+        """Verifica l'elenco condiviso delle feature continue usato anche dal K-Means."""
+        self.assertEqual(
+            COLONNE_CONTINUE,
+            [
+                'age',
+                'area_percentage',
+                'height_percentage',
+                'count_floors_pre_eq',
+                'count_families'
+            ]
+        )
 
     @patch('builtins.print')
     def test_standardizza_test_esegue_solo_transform(self, mock_print):

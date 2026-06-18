@@ -119,7 +119,7 @@ Suddivisione del dataset in:
 * **Standardizzazione (`data_standardization.py`)**: Scalatura con `StandardScaler` (media 0, deviazione standard 1) delle feature continue.
 
 #### ── FASE 6: Feature Engineering tramite Clustering K-Means
-Addestramento dell'algoritmo K-Means sulle feature continue del Train. Il numero ottimale di cluster viene supportato visivamente dall'Elbow Method (grafico `clustering_elbow.png`). Ad ogni record vengono aggiunte colonne dummy rappresentanti il cluster di appartenenza (`cluster_0` ... `cluster_4`), arricchendo lo spazio delle feature.
+Addestramento dell'algoritmo K-Means solo sulle feature continue standardizzate del Train (`age`, `area_percentage`, `height_percentage`, `count_floors_pre_eq`, `count_families`). Il numero ottimale di cluster viene supportato visivamente dall'Elbow Method (grafico `clustering_elbow.png`). Ad ogni record vengono poi aggiunte al dataset preprocessato completo le colonne dummy rappresentanti il cluster di appartenenza (`cluster_0` ... `cluster_4`), arricchendo lo spazio delle feature.
 
 #### ── FASE 7: Preprocessing & Clustering su Validation e Test Interno
 I dataset di Validation e Test vengono processati riutilizzando **esclusivamente gli estimatori precedentemente addestrati sul Train** (scaler, imputer, clusterer), garantendo l'assoluta assenza di *data leakage*.
