@@ -127,6 +127,7 @@ Suddivisione del dataset in:
 #### ── FASE 5: Preprocessing del Train Set (`data_pipeline/`)
 * **Pulizia (`data_cleaning.py`)**: Rimozione di duplicati; correzione di range numerici anomali (es. `age > 800` o negativi convertiti in NaN); gestione dei record con target nullo o con oltre il 30% di valori mancanti.
 * **Imputazione (`data_imputation.py`)**: Feature numeriche imputate con la mediana (`SimpleImputer` con strategia `median`); feature binarie e categoriche imputate con la moda (`SimpleImputer` con strategia `most_frequent`).
+* **Target Encoding geografico (`preprocessing.py`)**: Le colonne `geo_level_1_id`, `geo_level_2_id` e `geo_level_3_id` vengono sostituite con una codifica supervisionata tramite `TargetEncoder` addestrato solo sul Train Set, evitando di trattare gli ID geografici come grandezze continue nelle metriche di distanza.
 * **Encoding (`data_encoding.py`)**: Trasformazione delle 8 variabili categoriali in colonne dummy (One-Hot Encoding).
 * **Standardizzazione (`data_standardization.py`)**: Scalatura con `StandardScaler` (media 0, deviazione standard 1) delle feature continue.
 
@@ -137,7 +138,7 @@ Addestramento dell'algoritmo K-Means solo sulle feature continue standardizzate 
 I dataset di Validation e Test vengono processati riutilizzando **esclusivamente gli estimatori precedentemente addestrati sul Train** (scaler, imputer, clusterer), garantendo l'assoluta assenza di *data leakage*.
 
 #### ── FASE 8: Feature Selection & Hyperparameter Search (`model_evaluation/validation.py`)
-Esecuzione di una ricerca combinatoria casuale condizionale (`FeatureSelectionSearch`, invocata da `main.py` con **10 iterazioni** e **Cross-Validation su 3 fold**):
+Esecuzione di una ricerca combinatoria casuale condizionale (`FeatureSelectionSearch`, invocata da `main.py` con **100 iterazioni** di default, configurabili via YAML, e **Cross-Validation su 3 fold**):
 * **Selettori provati**: AllFeatures baseline, Mutual Information, ReliefF, selezione embedded con Decision Tree, e SequentialFeatureSelector (SFS).
 * **Classificatori ottimizzati**: Random Forest, AdaBoost, e K-Nearest Neighbors (KNN).
 * **Barra di Caricamento Personalizzata**: Per evitare l'output caotico di Joblib a terminale, viene utilizzata una barra di progresso testuale personalizzata (`SimpleProgressBar`) ad alta precisione con timer integrato.

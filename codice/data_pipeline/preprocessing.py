@@ -4,6 +4,7 @@ from .data_imputation import DataImputation
 from .data_encoding import DataEncoding
 from .data_standardization import DataScaling
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import TargetEncoder
 
 
 class Preprocessing:
@@ -12,7 +13,7 @@ class Preprocessing:
     Coordina in sequenza: pulizia, imputazione, encoding e standardizzazione.
     """
 
-    def __init__(self, dataframe: pd.DataFrame, scaler=None, imputer_num=None, imputer_bin=None, imputer_cat=None, colonne_eliminate=None, lista_colonne=None, is_train: bool = True):
+    def __init__(self, dataframe: pd.DataFrame, scaler=None, imputer_num=None, imputer_bin=None, imputer_cat=None, target_encoder=None, colonne_eliminate=None, lista_colonne=None, is_train: bool = True):
         """
         Inizializza l'orchestratore con il dataset, lo stato di training e gli scaler/imputer necessari.
 
@@ -20,6 +21,7 @@ class Preprocessing:
           - dataframe (pd.DataFrame): Dataset da preelaborare.
           - scaler (StandardScaler, opzionale): Scaler da iniettare/addestrare.
           - imputer_num, imputer_bin, imputer_cat (SimpleImputer, opzionali): Imputer per i diversi tipi di feature.
+          - target_encoder (TargetEncoder, opzionale): Encoder addestrato sulle feature geografiche.
           - colonne_eliminate (list, opzionale): Colonne escluse durante il training.
           - lista_colonne (list, opzionale): Struttura finale delle colonne per l'allineamento.
           - is_train (bool, default=True): Flag che indica se siamo in fase di training o test.
@@ -34,6 +36,7 @@ class Preprocessing:
         self.imputer_num = imputer_num
         self.imputer_bin = imputer_bin
         self.imputer_cat = imputer_cat
+        self.target_encoder = target_encoder
         self.colonne_eliminate = colonne_eliminate if colonne_eliminate is not None else []
         self.lista_colonne = lista_colonne if lista_colonne is not None else []
 
@@ -91,6 +94,40 @@ class Preprocessing:
             self.imputer_num = imputation.imputer_num
             self.imputer_bin = imputation.imputer_bin
             self.imputer_cat = imputation.imputer_cat
+
+        # ── FASE 2.5: TARGET ENCODING GEOGRAFICO ────────────────────
+        geo_cols = ['geo_level_1_id', 'geo_level_2_id', 'geo_level_3_id']
+        geo_cols_presenti = [c for c in geo_cols if c in self.df.columns]
+
+        if geo_cols_presenti:
+            print(f"\n  [2.5/4] Target Encoding variabili geografiche")
+            print(f"  {'-' * 48}")
+
+            if self.is_train:
+                if target_series is None:
+                    raise ValueError("TargetEncoder geografico richiede 'damage_grade' nel train set.")
+
+                self.target_encoder = TargetEncoder(
+                    categories='auto',
+                    target_type='continuous',
+                    random_state=42
+                )
+                encoded_geo = self.target_encoder.fit_transform(
+                    self.df[geo_cols_presenti],
+                    target_series
+                )
+                modalita = "fit_transform"
+            else:
+                if self.target_encoder is None:
+                    raise ValueError(
+                        "Sul test è obbligatorio passare il TargetEncoder addestrato sul train."
+                    )
+                encoded_geo = self.target_encoder.transform(self.df[geo_cols_presenti])
+                modalita = "transform"
+
+            self.df[geo_cols_presenti] = encoded_geo
+            print(f"  {'Colonne geografiche codificate (' + modalita + '):':<40} {len(geo_cols_presenti):>8}")
+            print(f"  Colonne: {geo_cols_presenti}")
  
         # ── FASE 3: ENCODING ─────────────────────────────────────────
         print(f"\n  [3/4] Encoding variabili categoriche")

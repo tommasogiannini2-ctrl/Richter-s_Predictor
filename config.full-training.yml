@@ -1,0 +1,83 @@
+# Configurazione per un run completo di addestramento end-to-end.
+#
+# Uso dalla root del progetto:
+#   python codice/main.py --config config.full-training.yml
+#
+# Nota importante:
+# questo YAML contiene solo chiavi effettivamente lette da codice/main.py.
+# La pipeline genera automaticamente output in:
+#   output/grafici/
+#   output/dataset/
+#   output/risultati/
+#   output/eval/
+
+run:
+  # false = forza una nuova esecuzione completa:
+  #   - caricamento dati
+  #   - EDA
+  #   - preprocessing
+  #   - clustering
+  #   - feature selection + hyperparameter search
+  #   - training finale
+  #   - valutazione
+  #   - submission
+  #
+  # true = se output/risultati/model_finale.pkl esiste, riusa il modello
+  # salvato e salta la ricerca/training completo.
+  use_saved_model: false
+
+data_reduction:
+  # false = usa tutto il dataset disponibile.
+  # true  = applica campionamento stratificato per stare sotto max_memory_mb.
+  #
+  # Per un run completo e rappresentativo, lasciare false.
+  # Impostare true solo per debug o macchine con poca RAM.
+  enabled: false
+
+  # Usato solo se enabled=true.
+  # Esempi:
+  #   4.0   = run molto leggero/debug
+  #   16.0  = run intermedio
+  #   64.0+ = quasi sempre dataset completo per questo progetto
+  max_memory_mb: 64.0
+
+clustering:
+  # Numero di cluster K-Means aggiunti come feature dummy:
+  # cluster_0, cluster_1, ..., cluster_{k-1}.
+  # Il README e il comportamento storico del progetto usano k=5.
+  k: 5
+
+  # Valore massimo di k provato per il grafico Elbow.
+  # Aumentare il valore rende il grafico piu' esplorativo ma piu' lento.
+  elbow_max_k: 12
+
+  # Numero massimo di righe usate per stimare il grafico Elbow.
+  # Non limita il training finale del K-Means, solo il grafico.
+  elbow_sample_size: 50000
+
+feature_selection:
+  # Numero totale di configurazioni campionate da RandomizedSearchCV.
+  #
+  # La ricerca esplora combinazioni di:
+  #   - selettori: AllFeatures, MutualInfo, ReliefF, EmbeddedDT, SFS
+  #   - modelli: RandomForest, KNN, AdaBoost
+  #
+  # Valori indicativi:
+  #   20-50   = veloce/debug
+  #   100     = default robusto
+  #   150-250 = run piu' ampio, molto piu' costoso
+  n_iter: 150
+
+  # Fold di cross-validation per ogni configurazione.
+  #
+  # 3 = buon compromesso tempo/affidabilita'.
+  # 5 = piu' stabile ma sensibilmente piu' lento, soprattutto con SFS.
+  cv: 3
+
+  # true = include SequentialFeatureSelector nello spazio di ricerca.
+  # SFS e' la parte piu' lenta, ma rende il run piu' completo.
+  include_sfs: true
+
+  # 0 = output minimo durante la ricerca.
+  # 1 = barra di progresso e riepilogo.
+  verbose: 1

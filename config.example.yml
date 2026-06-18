@@ -17,8 +17,7 @@ clustering:
   elbow_sample_size: 30000
 
 feature_selection:
-  n_iter: 10
+  n_iter: 100
   cv: 3
   include_sfs: true
   verbose: 1
-

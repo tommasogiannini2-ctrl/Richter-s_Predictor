@@ -54,6 +54,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import f1_score
 
 try:
     from codice.model_evaluation.feature_select_extract import (
@@ -455,6 +456,76 @@ class FeatureSelectionSearch:
         self.search_        = None   # oggetto RandomizedSearchCV fittato
         self.best_pipeline_ = None   # Pipeline con la migliore configurazione
         self.results_df_    = None   # DataFrame con tutti i risultati
+        self.best_selector_name_ = None
+        self.best_selector_ = None
+        self.best_score_ = None
+
+    def search(self, X_train, y_train, X_val, y_val, config: dict) -> pd.DataFrame:
+        """
+        Wrapper di compatibilità per la vecchia API usata dai test legacy.
+
+        La pipeline principale usa fit(), RandomizedSearchCV e get_results().
+        Questo metodo valuta esplicitamente i selettori passati in config su
+        un classificatore leggero, popola gli attributi storici e restituisce
+        un riepilogo per selettore.
+        """
+        selector_factories = {
+            "all": lambda params: AllFeaturesSelector(),
+            "mutual_info": lambda params: MutualInfoSelector(
+                k=params.get("k", 30),
+                random_state=self.random_state,
+                verbose=False,
+            ),
+            "relief": lambda params: ReliefFSelector(
+                k=params.get("k", 30),
+                n_samples=params.get("n_samples", 500),
+                random_state=self.random_state,
+                verbose=False,
+            ),
+            "sfs": lambda params: SFSSelector(
+                k=params.get("k", 20),
+                cv=params.get("cv", 3),
+                random_state=self.random_state,
+                n_jobs=1,
+                verbose=False,
+            ),
+            "embedded_dt": lambda params: EmbeddedDTSelector(
+                soglia=params.get("soglia", "mean"),
+                random_state=self.random_state,
+                verbose=False,
+            ),
+        }
+
+        righe = []
+        best_score = -np.inf
+
+        for nome, params in config.items():
+            if nome not in selector_factories:
+                raise ValueError(f"Selettore non supportato nella vecchia API: {nome}")
+
+            selector = selector_factories[nome](params)
+            selector.fit(X_train, y_train)
+            X_train_sel = selector.transform(X_train)
+            X_val_sel = selector.transform(X_val)
+
+            model = DecisionTreeClassifier(max_depth=8, random_state=self.random_state)
+            model.fit(X_train_sel, y_train)
+            y_pred = model.predict(X_val_sel)
+            score = f1_score(y_val, y_pred, average="micro")
+
+            righe.append({
+                "selector": nome,
+                "score": score,
+                "n_features": X_val_sel.shape[1],
+            })
+
+            if score > best_score:
+                best_score = score
+                self.best_selector_name_ = nome
+                self.best_selector_ = selector
+                self.best_score_ = score
+
+        return pd.DataFrame(righe)
 
     # -----------------------------------------------------------------------
     # METODO PRINCIPALE: fit
@@ -621,6 +692,12 @@ class FeatureSelectionSearch:
         """
         self._verifica_fit()
         return self.best_pipeline_["selector"].transform(X)
+
+    def transform_with_best(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Wrapper di compatibilità per la vecchia API dei test legacy."""
+        if self.best_selector_ is not None:
+            return self.best_selector_.transform(X)
+        return self.transform(X)
 
     # -----------------------------------------------------------------------
     # REPORT E UTILITÀ

@@ -136,6 +136,7 @@ if __name__ == "__main__":
         imputer_num = preprocessor.imputer_num
         imputer_bin = preprocessor.imputer_bin
         imputer_cat = preprocessor.imputer_cat
+        target_encoder = preprocessor.target_encoder
         colonne_eliminate = preprocessor.colonne_eliminate
         lista_colonne_train = preprocessor.lista_colonne
 
@@ -180,6 +181,7 @@ if __name__ == "__main__":
             pp = Preprocessing(
                 info["dati"], scaler=scaler_addestrato, imputer_num=imputer_num,
                 imputer_bin=imputer_bin, imputer_cat=imputer_cat,
+                target_encoder=target_encoder,
                 colonne_eliminate=colonne_eliminate, lista_colonne=lista_colonne_train, is_train=False
             )
             df_proc = pp.esegui()
@@ -213,7 +215,7 @@ if __name__ == "__main__":
             # ----------------------------------------------------------------
             print("  [TRAIN=TRUE] Avvio ricerca spaziale FeatureSelectionSearch...")
             search = FeatureSelectionSearch(
-                n_iter=int(get_nested(config, "feature_selection.n_iter", 10)),
+                n_iter=int(get_nested(config, "feature_selection.n_iter", 100)),
                 cv=int(get_nested(config, "feature_selection.cv", 3)),
                 include_sfs=bool(get_nested(config, "feature_selection.include_sfs", True)),
                 verbose=int(get_nested(config, "feature_selection.verbose", 1)),
@@ -290,6 +292,7 @@ if __name__ == "__main__":
         pp_test_uff = Preprocessing(
             df_test_ufficiale, scaler=scaler_addestrato, imputer_num=imputer_num,
             imputer_bin=imputer_bin, imputer_cat=imputer_cat,
+            target_encoder=target_encoder,
             colonne_eliminate=colonne_eliminate, lista_colonne=lista_colonne_train, is_train=False
         )
         df_test_uff_proc = pp_test_uff.esegui()
