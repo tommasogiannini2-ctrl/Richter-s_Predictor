@@ -55,13 +55,22 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import RandomizedSearchCV
 
-from model_evaluation.feature_select_extract import (
-    AllFeaturesSelector,
-    MutualInfoSelector,
-    ReliefFSelector,
-    SFSSelector,
-    EmbeddedDTSelector,
-)
+try:
+    from codice.model_evaluation.feature_select_extract import (
+        AllFeaturesSelector,
+        MutualInfoSelector,
+        ReliefFSelector,
+        SFSSelector,
+        EmbeddedDTSelector,
+    )
+except ModuleNotFoundError:
+    from model_evaluation.feature_select_extract import (
+        AllFeaturesSelector,
+        MutualInfoSelector,
+        ReliefFSelector,
+        SFSSelector,
+        EmbeddedDTSelector,
+    )
 
 import sys
 import contextlib

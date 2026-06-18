@@ -1,18 +1,32 @@
 import os
+import sys
 import pandas as pd
 import gc
 import joblib
 
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 
-from codice.model_evaluation.train_model import predict_only
-from data_pipeline.preprocessing import Preprocessing, dividi_train_validation_test
-from data_pipeline.file_opener import scegli_opener
-from data_reduction import DataReducer
-from plot import Plotter
-from data_pipeline.clustering import Clustering
-from model_evaluation.validation import FeatureSelectionSearch
-from model_evaluation.train_model import run as avvia_training
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from codice.model_evaluation.train_model import predict_only
+    from codice.data_pipeline.preprocessing import Preprocessing, dividi_train_validation_test
+    from codice.data_pipeline.file_opener import scegli_opener
+    from codice.data_reduction import DataReducer
+    from codice.plot import Plotter
+    from codice.data_pipeline.clustering import Clustering
+    from codice.model_evaluation.validation import FeatureSelectionSearch
+    from codice.model_evaluation.train_model import run as avvia_training
+except ModuleNotFoundError:
+    from model_evaluation.train_model import predict_only
+    from data_pipeline.preprocessing import Preprocessing, dividi_train_validation_test
+    from data_pipeline.file_opener import scegli_opener
+    from data_reduction import DataReducer
+    from plot import Plotter
+    from data_pipeline.clustering import Clustering
+    from model_evaluation.validation import FeatureSelectionSearch
+    from model_evaluation.train_model import run as avvia_training
 
 if __name__ == "__main__":
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -165,7 +179,7 @@ if __name__ == "__main__":
             # CASO A: Training completo (Lancia la ricerca RandomizedSearchCV)
             # ----------------------------------------------------------------
             print("  [TRAIN=TRUE] Avvio ricerca spaziale FeatureSelectionSearch...")
-            search = FeatureSelectionSearch(n_iter=10, cv=3, include_sfs=True, verbose=1, output_dir=output_dir)
+            search = FeatureSelectionSearch(n_iter=10, cv=3, include_sfs=True, verbose=1, output_dir=None)
             search.fit(X_train_fs, y_train_fs)
 
             output_fs_path = os.path.join(risultati_dir, 'feature_selection_results.csv')

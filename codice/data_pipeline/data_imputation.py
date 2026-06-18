@@ -1,13 +1,12 @@
 import pandas as pd
-from sklearn.experimental import enable_iterative_imputer
-from sklearn.impute import IterativeImputer, SimpleImputer
+from sklearn.impute import SimpleImputer
 
 
 class DataImputation:
     """
     Gestione dell'imputazione dei valori mancanti nel dataset.
-    Supporta l'imputazione mediante la moda ( SimpleImputer ) per variabili binarie
-    e categoriali, e mediante la mediana/MICE per le variabili numeriche continue,
+    Supporta l'imputazione mediante la moda (SimpleImputer) per variabili binarie
+    e categoriali, e mediante la mediana per le variabili numeriche continue,
     prevenendo il data leakage tra training e test set.
     """
 
@@ -17,7 +16,7 @@ class DataImputation:
 
         Input:
           - dataframe (pd.DataFrame): Dataset su cui effettuare l'imputazione.
-          - imputer_num (SimpleImputer/IterativeImputer, opzionale): Imputer per feature continue.
+          - imputer_num (SimpleImputer, opzionale): Imputer per feature continue.
           - imputer_bin (SimpleImputer, opzionale): Imputer per feature binarie (has_*).
           - imputer_cat (SimpleImputer, opzionale): Imputer per feature categoriche (stringhe).
           - is_train (bool, default=True): Flag che indica se siamo in fase di training o test.

@@ -76,6 +76,12 @@ L'esecuzione del file principale coordina una pipeline end-to-end avanzata, stru
 python codice/main.py
 ```
 
+In alternativa, dalla root del repository:
+
+```bash
+python -m codice.main
+```
+
 ### Le 10 Fasi della Pipeline:
 
 ```mermaid
@@ -102,13 +108,13 @@ Un sistema di sicurezza analizza la RAM occupata dal dataset. L'utente può sceg
 
 #### ── FASE 4: Partizionamento Rigoroso
 Suddivisione del dataset in:
-* **Train Set** (60%) — Utilizzato per calcolare statistiche, addestrare scaler, imputer e modelli.
-* **Validation Set** (20%) — Utilizzato per l'ottimizzazione degli iperparametri e la selezione del modello.
-* **Test Set Interno** (20%) — Destinato esclusivamente alla valutazione finale delle performance *unseen*.
+* **Train Set** (70%) — Utilizzato per calcolare statistiche, addestrare scaler, imputer e modelli.
+* **Validation Set** (15%) — Utilizzato per l'ottimizzazione degli iperparametri e la selezione del modello.
+* **Test Set Interno** (15%) — Destinato esclusivamente alla valutazione finale delle performance *unseen*.
 
 #### ── FASE 5: Preprocessing del Train Set (`data_pipeline/`)
 * **Pulizia (`data_cleaning.py`)**: Rimozione di duplicati; correzione di range numerici anomali (es. `age > 800` o negativi convertiti in NaN); gestione dei record con target nullo o con oltre il 30% di valori mancanti.
-* **Imputazione (`data_imputation.py`)**: Feature numeriche imputate tramite regressione multivariata (`IterativeImputer` MICE, max 10 iterazioni); feature categoriche imputate con la moda (`SimpleImputer` con strategia `most_frequent`).
+* **Imputazione (`data_imputation.py`)**: Feature numeriche imputate con la mediana (`SimpleImputer` con strategia `median`); feature binarie e categoriche imputate con la moda (`SimpleImputer` con strategia `most_frequent`).
 * **Encoding (`data_encoding.py`)**: Trasformazione delle 8 variabili categoriali in colonne dummy (One-Hot Encoding).
 * **Standardizzazione (`data_standardization.py`)**: Scalatura con `StandardScaler` (media 0, deviazione standard 1) delle feature continue.
 
@@ -119,8 +125,8 @@ Addestramento dell'algoritmo K-Means sulle feature continue del Train. Il numero
 I dataset di Validation e Test vengono processati riutilizzando **esclusivamente gli estimatori precedentemente addestrati sul Train** (scaler, imputer, clusterer), garantendo l'assoluta assenza di *data leakage*.
 
 #### ── FASE 8: Feature Selection & Hyperparameter Search (`model_evaluation/validation.py`)
-Esecuzione di una ricerca combinatoria casuale condizionale (`FeatureSelectionSearch`, impostata di default su **100 iterazioni** e **Cross-Validation su 3 fold**):
-* **Filtri di Selezione provati**: SelectKBest (ANOVA), SelectFromModel (con alberi di decisione o modelli lineari), PCA, e SequentialFeatureSelector (SFS).
+Esecuzione di una ricerca combinatoria casuale condizionale (`FeatureSelectionSearch`, invocata da `main.py` con **10 iterazioni** e **Cross-Validation su 3 fold**):
+* **Selettori provati**: AllFeatures baseline, Mutual Information, ReliefF, selezione embedded con Decision Tree, e SequentialFeatureSelector (SFS).
 * **Classificatori ottimizzati**: Random Forest, AdaBoost, e K-Nearest Neighbors (KNN).
 * **Barra di Caricamento Personalizzata**: Per evitare l'output caotico di Joblib a terminale, viene utilizzata una barra di progresso testuale personalizzata (`SimpleProgressBar`) ad alta precisione con timer integrato.
 Al termine, i dataset vengono filtrati includendo solo il miglior set di feature individuato e i risultati della ricerca vengono salvati in `feature_selection_results.csv`.
@@ -171,6 +177,12 @@ Oltre al flusso automatico di `main.py`, è possibile addestrare, valutare e gen
 
 ```bash
 python codice/model_evaluation/train_model.py --model rf --n-estimators 300 --max-depth 15
+```
+
+Forma equivalente da modulo:
+
+```bash
+python -m codice.model_evaluation.train_model --model rf --n-estimators 300 --max-depth 15
 ```
 
 ### Parametri CLI Disponibili:

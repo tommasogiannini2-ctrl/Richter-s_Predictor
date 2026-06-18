@@ -24,7 +24,13 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 
-from model_evaluation.evaluation import ModelEvaluator
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+try:
+    from codice.model_evaluation.evaluation import ModelEvaluator
+except ModuleNotFoundError:
+    from model_evaluation.evaluation import ModelEvaluator
 
 
 # ===========================================================================
