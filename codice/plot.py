@@ -140,17 +140,52 @@ class Plotter:
     def plot_correlazioni(self, soglia_annotazione: float = 0.3):
         """
         Heatmap di correlazione di Pearson tra feature numeriche e target.
+        Le feature geografiche ad alta cardinalità (geo_level_*_id) vengono
+        temporaneamente Target-Encoded rispetto al target prima di calcolare
+        la correlazione, in modo da rendere il calcolo di Pearson statisticamente valido.
         """
+        df_corr = self.df.copy()
+
+        geo_cols = ["geo_level_1_id", "geo_level_2_id", "geo_level_3_id"]
+        geo_cols_presenti = [c for c in geo_cols if c in df_corr.columns]
+
+        if geo_cols_presenti and self.target in df_corr.columns:
+            # Controlla se le colonne geografiche sono già state codificate
+            da_codificare = [
+                c for c in geo_cols_presenti
+                if not pd.api.types.is_float_dtype(df_corr[c])
+            ]
+            if da_codificare:
+                from sklearn.preprocessing import TargetEncoder
+                print(f"  [Plotter] Target Encoding temporaneo per le correlazioni geografiche: {da_codificare}")
+                
+                # Convertiamo le colonne in float per evitare il LossySetitemError di pandas
+                for c in da_codificare:
+                    df_corr[c] = df_corr[c].astype(float)
+                
+                encoder = TargetEncoder(
+                    categories='auto',
+                    target_type='continuous',
+                    random_state=42
+                )
+                mask_notna = df_corr[self.target].notna()
+                if mask_notna.any():
+                    encoded_vals = encoder.fit_transform(
+                        df_corr.loc[mask_notna, da_codificare],
+                        df_corr.loc[mask_notna, self.target]
+                    )
+                    df_corr.loc[mask_notna, da_codificare] = encoded_vals
+
         colonne_da_correlare = [
-            c for c in (self.colonne_continue + self.colonne_binarie + [self.target])
-            if c in self.df.columns
+            c for c in (self.colonne_continue + geo_cols_presenti + self.colonne_binarie + [self.target])
+            if c in df_corr.columns
         ]
 
         if len(colonne_da_correlare) < 2:
             print("  [Skip] Meno di 2 colonne numeriche disponibili.")
             return
 
-        matrice_corr = self.df[colonne_da_correlare].corr()
+        matrice_corr = df_corr[colonne_da_correlare].corr()
         mask = np.triu(np.ones_like(matrice_corr, dtype=bool))
 
         annot_matrix = matrice_corr.round(2).astype(str)
@@ -164,14 +199,14 @@ class Plotter:
             matrice_corr,
             mask=mask,
             annot=annot_matrix,
-            fmt="",                          
+            fmt="",
             cmap="RdBu_r",
             center=0,
             vmin=-1, vmax=1,
             square=True,
             linewidths=0.5,
             cbar_kws={"shrink": 0.7, "label": "Coefficiente di correlazione"},
-            annot_kws={"size": 8},          
+            annot_kws={"size": 8},
             ax=ax,
         )
         ax.set_title(
