@@ -6,7 +6,7 @@
 **Fonte competizione:**
 DrivenData. (2019). *Richter's Predictor: Modeling Earthquake Damage.*
 https://www.drivendata.org/competitions/57/nepal-earthquake/
-
+https://alcampusit-my.sharepoint.com/:u:/g/personal/paolo_ardolino_alcampus_it/IQCNw0ZWMJ9bQpDEXBEpiwssATKAMn2LSXSLfA323cvNmvQ?e=hRhJcE
 ---
 
 ## 📝 Descrizione del problema
