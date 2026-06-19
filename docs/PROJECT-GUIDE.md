@@ -57,6 +57,27 @@ Comando previsto:
 python codice/main.py --config config.full-training.yml
 ```
 
+### Configurazione operativa
+
+La pipeline puo' essere guidata da YAML tramite `codice/main.py --config ...`.
+Le chiavi effettivamente lette dal codice sono:
+
+- `run.use_saved_model`: se `true` e `output/risultati/model_finale.pkl` esiste,
+  la pipeline ricostruisce il preprocessing del test ufficiale e usa
+  `predict_only()` per rigenerare la submission senza rifare ricerca e training.
+- `data_reduction.enabled` e `data_reduction.max_memory_mb`: controllano il
+  campionamento stratificato di debug tramite `DataReducer`.
+- `clustering.k`: numero di cluster K-Means trasformati in dummy `cluster_*`.
+- `clustering.elbow_max_k` e `clustering.elbow_sample_size`: influenzano solo il
+  grafico elbow, non il numero finale di cluster.
+- `feature_selection.n_iter`, `feature_selection.cv`,
+  `feature_selection.include_sfs` e `feature_selection.verbose`: configurano
+  `FeatureSelectionSearch` e il costo della ricerca.
+
+`config.example.yml` e' pensato per run leggeri o debug perche' riduce il dataset.
+`config.full-training.yml` e' il profilo piu' rappresentativo per produrre una
+submission completa.
+
 ## Cartella `.idea/`
 
 Cartella di configurazione dell'IDE JetBrains/PyCharm. Non serve all'esecuzione
@@ -242,6 +263,20 @@ Sequenza gestita da `Preprocessing.esegui()`:
 
 `dividi_train_validation_test()` crea uno split stratificato 70% / 15% / 15%.
 
+Contratto operativo:
+
+- il train esegue `fit_transform` per pulizia, imputazione, target encoding,
+  one-hot encoding e scaling;
+- validation, test interno e test ufficiale riusano gli oggetti addestrati sul
+  train, evitando data leakage;
+- le colonne eliminate o create durante il train vengono conservate e riusate per
+  riallineare validation/test con lo stesso schema;
+- `damage_grade` resta presente solo dove serve alla valutazione, mentre
+  `building_id` viene preservato per il test ufficiale per costruire
+  `submission.csv`;
+- se una categoria compare solo in validation/test, viene gestita con
+  riallineamento delle colonne invece di modificare lo schema appreso sul train.
+
 ### `codice/data_pipeline/clustering.py`
 
 Contiene `Clustering`, wrapper per K-Means.
@@ -289,6 +324,19 @@ Componenti principali:
 La ricerca prova combinazioni con Random Forest, KNN e AdaBoost, usando
 `f1_micro` come metrica predefinita.
 
+Dettagli importanti:
+
+- lo spazio di ricerca e' una lista di dizionari condizionali: ogni dizionario
+  abbina un selettore a un modello e ai soli iperparametri compatibili;
+- `include_sfs=true` aggiunge Sequential Feature Selection, ma questa e' la parte
+  piu' costosa perche' moltiplica i fit interni;
+- `n_iter` indica il numero totale di configurazioni campionate, non il numero
+  di prove per ogni modello;
+- i risultati vengono convertiti in `feature_selection_results.csv` con rank,
+  selettore, modello, score medio CV e deviazione standard;
+- il best estimator resta disponibile per predizione, trasformazione delle
+  feature e recupero dei parametri migliori.
+
 ### `codice/model_evaluation/train_model.py`
 
 Modulo per addestramento finale e predizione.
@@ -306,6 +354,13 @@ Output principali in `output/risultati/`:
 - `model_finale.pkl`;
 - `model_finale_best_micro_f1.txt`;
 - `submission.csv`.
+
+`model_finale.pkl` non contiene solo l'estimatore: viene salvato come checkpoint
+con le informazioni necessarie a riutilizzare il modello finale in modalita'
+predict-only. `run(...)` valuta validation e test interno se i rispettivi file
+sono presenti, poi produce la submission sul test ufficiale preprocessato.
+`predict_only(...)` richiede invece un checkpoint gia' esistente e
+`output/dataset/test_ufficiale_finale.csv`.
 
 ### `codice/model_evaluation/evaluation.py`
 
@@ -411,6 +466,11 @@ Dataset intermedi e finali generati dalla pipeline:
 - `train_finale.csv`, `val_finale.csv`, `test_finale.csv`;
 - `test_ufficiale_finale.csv`.
 
+I file `*_processato.csv` sono prodotti dopo preprocessing e clustering. I file
+`*_finale.csv` sono quelli usati dal training finale dopo selezione/allineamento
+delle feature. `test_ufficiale_finale.csv` conserva `building_id`, necessario per
+scrivere la submission DrivenData.
+
 ### `output/grafici/`
 
 Grafici EDA e grafico elbow del clustering.
@@ -423,6 +483,11 @@ Risultati finali della ricerca e del training:
 - `model_finale.pkl`;
 - `model_finale_best_micro_f1.txt`;
 - `submission.csv`.
+
+`feature_selection_results.csv` serve per ispezionare le configurazioni provate
+da `RandomizedSearchCV`. `model_finale.pkl` abilita la modalita'
+`run.use_saved_model=true`. `submission.csv` e' il file finale da caricare sulla
+piattaforma della competizione.
 
 ### `output/eval/`
 
